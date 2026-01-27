@@ -12,25 +12,11 @@
     <style>
         :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); }
         body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; color: white; }
-
-        .bg-cuartel {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: url('cuartel.jpg') no-repeat center center;
-            background-size: cover;
-            filter: blur(8px) brightness(0.4);
-            z-index: 1;
-            transform: scale(1.05);
-        }
-
+        .bg-cuartel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: url('cuartel.jpg') no-repeat center center; background-size: cover; filter: blur(8px) brightness(0.4); z-index: 1; transform: scale(1.05); }
         #map-full { position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; z-index: 5; display: none; }
         .btn-back { position: fixed; top: 10px; left: 10px; z-index: 3000; background: rgba(51,51,51,0.8); color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 11px; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
-
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
-        .drawer-handle { 
-            width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px;
-        }
-
+        .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
         .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; display: flex; }
         .full-panel.active { left: 0; }
         #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; position: absolute; right: 0; height: 100%; z-index: 10; }
@@ -152,7 +138,10 @@
 
     function ejecutarDespacho() {
         const direccionVal = document.getElementById('pac-input').value;
-        if (!tipoSeleccionado || !lat) return alert("Faltan datos");
+        if (!tipoSeleccionado || !lat) {
+            alert("Faltan datos: Seleccione Tipo y Ubicación");
+            return;
+        }
         const alerta = { aviso: tipoSeleccionado, direccion: direccionVal, lat: lat, lon: lon, timestamp: Date.now() };
         const message = new Paho.MQTT.Message(JSON.stringify(alerta));
         message.destinationName = "bomberos/unidad/B1";
@@ -199,12 +188,17 @@
     }
 
     function initMap() {
+        const chascomusCenter = { lat: -35.576, lng: -58.010 };
         map = new google.maps.Map(document.getElementById("map-full"), {
-            zoom: 14, center: { lat: -35.576, lng: -58.010 },
+            zoom: 14, center: chascomusCenter,
             styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
         });
+        const bounds = new google.maps.LatLngBounds(
+            new google.maps.LatLng(-35.900, -58.300),
+            new google.maps.LatLng(-35.400, -57.700)
+        );
         const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), {
-            componentRestrictions: { country: "ar" }, strictBounds: true
+            bounds: bounds, componentRestrictions: { country: "ar" }, strictBounds: true
         });
         auto.addListener("place_changed", () => {
             const p = auto.getPlace(); if (!p.geometry) return;
