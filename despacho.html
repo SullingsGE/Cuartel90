@@ -11,10 +11,8 @@
     
     <style>
         :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); }
-        
         body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; color: white; }
 
-        /* FONDO PRINCIPAL */
         .bg-cuartel {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -25,12 +23,7 @@
             transform: scale(1.05);
         }
 
-        /* CAPA DEL MAPA (Tapa la foto al abrir despacho) */
-        #map-full { 
-            position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; 
-            z-index: 5; display: none; 
-        }
-
+        #map-full { position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; z-index: 5; display: none; }
         .btn-back { position: fixed; top: 10px; left: 10px; z-index: 3000; background: rgba(51,51,51,0.8); color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 11px; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
 
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
@@ -40,25 +33,17 @@
 
         .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; display: flex; }
         .full-panel.active { left: 0; }
-        
         #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; position: absolute; right: 0; height: 100%; z-index: 10; }
-        
-        /* ESCUDO EN EL PANEL */
         .panel-header { width: 100%; height: 100px; background: url('escudo.png') no-repeat center; background-size: contain; margin-bottom: 10px; }
-
         #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.9); padding: 40px 40px 40px 80px; box-sizing: border-box; display: flex; flex-direction: column; backdrop-filter: blur(15px); }
-        
         .close-btn { position: absolute; top: 20px; right: 30px; font-size: 45px; color: white; cursor: pointer; z-index: 1100; background: none; border: none; }
         .input-std { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.6); border: 1px solid #555; color: white; border-radius: 6px; box-sizing: border-box; }
-        
         .btn-tipo { width: 100%; padding: 12px; margin-bottom: 8px; border: 2px solid transparent; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; opacity: 0.6; }
         .btn-tipo.selected { opacity: 1; border-color: white; transform: scale(1.02); }
-        
         .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; }
         .btn-rescate { background: #2980b9; }
         .btn-accidente { background: #f1c40f; color: #000; }
         .btn-incendio { background: #c0392b; }
-        
         #historial-bit { flex-grow: 1; background: rgba(0,0,0,0.5); overflow-y: auto; margin: 20px 0; padding: 20px; border-radius: 8px; border: 1px solid #444; }
         .log-entry { border-left: 4px solid var(--primary); background: rgba(26, 30, 35, 0.8); padding: 12px; margin-bottom: 12px; }
     </style>
@@ -66,7 +51,6 @@
 <body>
 
 <div class="bg-cuartel"></div>
-
 <a href="index.html" class="btn-back">« MENU PRINCIPAL</a>
 
 <div class="handle-container">
@@ -81,14 +65,12 @@
         <div class="panel-header"></div> 
         <h2 style="color:var(--primary); margin: 0; text-align: center; letter-spacing: 2px;">CENTRAL B1</h2>
         <input id="pac-input" class="input-std" type="text" placeholder="Calle o Ruta en Chascomús...">
-        
         <div style="margin: 20px 0; flex-grow: 1; overflow-y: auto;">
             <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE ACUATICO')">RESCATE ACUATICO</button>
             <button class="btn-tipo btn-accidente" onclick="seleccionar(this, 'ACCIDENTE VIAL')">ACCIDENTE VIAL</button>
             <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO FORESTAL')">INCENDIO FORESTAL</button>
             <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO ESTRUCTURAL')">INCENDIO ESTRUCTURAL</button>
         </div>
-        
         <button class="btn-action" onclick="ejecutarDespacho()">ENVIAR ALERTA A UNIDAD</button>
         <p id="mqtt-status" style="font-size:11px; color:#e74c3c; text-align:center; margin-top:15px; font-weight: bold;">CONECTANDO...</p>
     </div>
@@ -132,24 +114,18 @@
         document.getElementById(id).classList.add('active');
         if(id === 'panel-despacho') {
             document.getElementById('map-full').style.display = 'block';
-            setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 500);
+            if(map) setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 500);
         }
     }
 
-    // FUNCIÓN DE LIMPIEZA TOTAL AL CERRAR CON LA X
     function cerrarPaneles() {
-        // Retraer paneles y ocultar mapa
         document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
         document.getElementById('map-full').style.display = 'none';
-        
-        // Limpiar campos de Despacho
         tipoSeleccionado = "";
         lat = null; lon = null;
         document.getElementById('pac-input').value = "";
         document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
         if (marker) marker.setMap(null);
-        
-        // Resetear Libro de Guardia
         usuarioLogueado = "";
         document.getElementById('u-bit').value = "";
         document.getElementById('p-bit').value = "";
@@ -159,7 +135,7 @@
     }
 
     function conectarMQTT() {
-        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_C_" + Math.random().toString(16).slice(2, 5));
+        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_C_" + Math.random().toString(16).slice(2, 6));
         client.connect({ useSSL: true, onSuccess: () => {
             document.getElementById('mqtt-status').innerText = "SISTEMA ONLINE";
             document.getElementById('mqtt-status').style.color = "#2ecc71";
@@ -172,11 +148,16 @@
         tipoSeleccionado = tipo;
     }
 
+    // CORRECCIÓN AQUÍ: Eliminado el error de las llaves
     function ejecutarDespacho() {
         const direccionVal = document.getElementById('pac-input').value;
         if (!tipoSeleccionado || !lat) return alert("Faltan datos");
         const alerta = { aviso: tipoSeleccionado, direccion: direccionVal, lat: lat, lon: lon, timestamp: Date.now() };
-        client.send(new Paho.MQTT.Message(JSON.stringify(alerta)) {{ destinationName: "bomberos/unidad/B1" }});
+        
+        const message = new Paho.MQTT.Message(JSON.stringify(alerta));
+        message.destinationName = "bomberos/unidad/B1";
+        client.send(message);
+        
         alert("DESPACHO ENVIADO");
         cerrarPaneles();
     }
