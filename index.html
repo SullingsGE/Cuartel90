@@ -2,81 +2,105 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>S.O.S. Táctico</title>
+    <title>Unidad de Intervención</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: monospace; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; opacity: 0.6; }
-        #ui { position: absolute; top: 0; width: 100%; z-index: 1000; text-align: center; }
-        #header { background: #444; padding: 15px; font-weight: bold; border-bottom: 2px solid #fff; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; }
+        #header { 
+            position: absolute; top: 0; width: 100%; z-index: 1000; 
+            background: #2c3e50; padding: 15px; text-align: center; 
+            font-weight: bold; border-bottom: 3px solid #e67e22;
+        }
         #console { 
             position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.8); 
-            height: 120px; font-size: 11px; padding: 10px; border-top: 1px solid #0f0;
-            overflow-y: auto; color: #0f0; z-index: 2000;
+            height: 80px; font-size: 10px; padding: 10px; color: #0f0; z-index: 2000;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <div id="ui"><div id="header">ESTADO: INICIANDO...</div></div>
+    <div id="header">BUSCANDO SEÑAL GPS...</div>
     <div id="console"></div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 
     <script>
-        const log = (m) => { 
-            const c = document.getElementById('console');
-            c.innerHTML += "> " + m + "<br>";
-            c.scrollTop = c.scrollHeight;
-        };
-
-        window.onerror = (msg) => log("ERR: " + msg);
-
-        // 1. Iniciar Mapa inmediatamente
-        var map = L.map('map', {zoomControl: false}).setView([40.41, -3.70], 13);
+        const log = (m) => { document.getElementById('console').innerHTML += "> " + m + "<br>"; };
+        
+        // 1. Iniciar Mapa (Vacío al principio)
+        var map = L.map('map', {zoomControl: false}).setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        log("Mapa cargado.");
 
-        // 2. Intentar conexión MQTT
-        function iniciarMQTT() {
-            const clientID = "UNIT_" + Math.floor(Math.random() * 1000);
-            // Probamos con el host de HiveMQ que es más permisivo con websockets
-            const client = new Paho.MQTT.Client("wss://broker.hivemq.com:8884/mqtt", clientID);
+        var miPosicion = null;
+        var marcadorUnidad = null;
+        var rutaActual = null;
+
+        // 2. Lógica de GPS Real
+        map.on('locationfound', (e) => {
+            miPosicion = e.latlng;
+            if (!marcadorUnidad) {
+                log("GPS Localizado correctamente.");
+                document.getElementById('header').innerText = "UNIDAD OPERATIVA - ESPERANDO";
+                document.getElementById('header').style.background = "#27ae60";
+                marcadorUnidad = L.circleMarker(miPosicion, {
+                    radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.8
+                }).addTo(map).bindPopup("Tu ubicación").openPopup();
+                map.setView(miPosicion, 16);
+            } else {
+                marcadorUnidad.setLatLng(miPosicion);
+            }
+        });
+
+        map.on('locationerror', () => {
+            log("Error: Activa el GPS del celular.");
+            document.getElementById('header').innerText = "ERROR: ACTIVA GPS";
+        });
+
+        map.locate({watch: true, enableHighAccuracy: true});
+
+        // 3. Conexión MQTT (HiveMQ estable)
+        function conectar() {
+            const cid = "UNIT_" + Math.random().toString(16).substr(2, 5);
+            const client = new Paho.MQTT.Client("wss://broker.hivemq.com:8884/mqtt", cid);
 
             client.onMessageArrived = (msg) => {
-                log("AVISO RECIBIDO!");
                 const d = JSON.parse(msg.payloadString);
+                log("¡ALERTA RECIBIDA!");
                 document.getElementById('header').innerText = "INCENDIO: " + d.aviso;
-                document.getElementById('header').style.background = "red";
-                L.marker([d.lat, d.lon]).addTo(map).bindPopup(d.aviso).openPopup();
-                map.flyTo([d.lat, d.lon], 16);
+                document.getElementById('header').style.background = "#c0392b";
+
+                const destino = L.latLng(d.lat, d.lon);
+
+                // Dibujar Ruta desde posición real
+                if (rutaActual) map.removeControl(rutaActual);
+                rutaActual = L.Routing.control({
+                    waypoints: [miPosicion, destino],
+                    lineOptions: { styles: [{ color: '#e67e22', weight: 6 }] },
+                    createMarker: function() { return null; }
+                }).addTo(map);
+
+                map.flyTo(destino, 16);
             };
 
-            const connectOptions = {
+            client.connect({
                 useSSL: true,
-                timeout: 10,
                 onSuccess: () => {
-                    log("CONECTADO AL BROKER");
-                    document.getElementById('header').innerText = "ESPERANDO DESPACHO";
-                    document.getElementById('header').style.background = "green";
+                    log("Conectado a Central.");
                     client.subscribe("bomberos/unidad/B1");
                 },
-                onFailure: (e) => {
-                    log("FALLO CONEXIÓN: " + e.errorMessage);
-                    log("Reintentando en 5s...");
-                    setTimeout(iniciarMQTT, 5000);
-                }
-            };
-
-            log("Abriendo Socket seguro...");
-            client.connect(connectOptions);
+                onFailure: () => { setTimeout(conectar, 5000); }
+            });
         }
 
-        setTimeout(iniciarMQTT, 1000);
+        conectar();
     </script>
 </body>
 </html>
+
 
