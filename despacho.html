@@ -13,6 +13,9 @@
         :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--dark); height: 100vh; overflow: hidden; color: white; }
         
+        /* BOTÓN VOLVER AGREGADO */
+        .btn-back { position: fixed; top: 10px; left: 10px; z-index: 3000; background: #333; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 0.7rem; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
+
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
         .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
 
@@ -39,6 +42,8 @@
     </style>
 </head>
 <body>
+
+<a href="index.html" class="btn-back">« MENU</a>
 
 <div class="handle-container">
     <div class="drawer-handle" onclick="abrirPanel('panel-despacho')">DESPACHO</div>
@@ -133,12 +138,13 @@
         const direccionVal = document.getElementById('pac-input').value;
         if (!tipoSeleccionado || !lat || !direccionVal) return alert("Faltan datos de ubicación");
 
-        // Sincronizado con index.html (aviso, direccion, lat, lon)
+        // CORRECCIÓN: Se agrega timestamp: Date.now() para que la unidad acepte la alerta
         const alerta = {
             aviso: tipoSeleccionado,
             direccion: direccionVal,
             lat: lat,
-            lon: lon
+            lon: lon,
+            timestamp: Date.now()
         };
 
         if (client && client.isConnected()) {
@@ -189,27 +195,20 @@
     function exportarPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        
-        // 1. Calcular rango de 7 días
         const hoy = new Date();
         const limite = new Date();
         limite.setDate(hoy.getDate() - 7);
-
-        // 2. Filtrar por Usuario y por Fecha
         const filtrados = registrosMemoria.filter(r => {
             const p = r.fecha.split('/');
             const fReg = new Date(p[2], p[1]-1, p[0]);
             return r.usuario === usuarioLogueado && fReg >= limite;
         });
-
         if(filtrados.length === 0) return alert("No hay registros tuyos en los últimos 7 días.");
-
         const fS = hoy.toLocaleDateString('es-AR').replace(/\//g, "-");
         doc.setFontSize(14);
         doc.text("B.V. CHASCOMÚS - LIBRO DE GUARDIA", 14, 20);
         doc.setFontSize(10);
         doc.text(`OPERADOR: ${usuarioLogueado} | PERIODO SEMANAL`, 14, 28);
-
         doc.autoTable({
             startY: 35,
             head: [['Fecha', 'Hora', 'Novedad']],
@@ -232,7 +231,6 @@
             zoom: 14, center: { lat: -35.576, lng: -58.010 },
             styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
         });
-        // Límite Chascomús
         const bounds = { north: -35.350, south: -36.050, east: -57.700, west: -58.350 };
         const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), {
             bounds: bounds, componentRestrictions: { country: "ar" }, strictBounds: true
