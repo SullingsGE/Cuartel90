@@ -23,14 +23,14 @@
         }
 
         #log-status {
-            position: absolute; bottom: 80px; left: 10px; z-index: 1000;
+            position: absolute; bottom: 85px; left: 10px; z-index: 1000;
             background: rgba(0,0,0,0.8); color: #00ff00;
-            padding: 5px 10px; border-radius: 4px; font-size: 0.75em;
-            font-family: monospace;
+            padding: 6px 12px; border-radius: 4px; font-size: 0.75em;
+            font-family: monospace; border: 1px solid #333;
         }
 
         #controls {
-            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            position: absolute; bottom: 25px; right: 20px; z-index: 1000;
         }
 
         .btn-follow {
@@ -68,19 +68,19 @@
             iconSize: [22, 22], iconAnchor: [11, 11]
         });
 
-        // --- 2. CONFIGURACIÓN MQTT (CONEXIÓN SEGURA 443) ---
-        var host = "broker.emqx.io";
+        // --- 2. CONFIGURACIÓN MQTT (SHIFTR.IO COMPATIBILITY) ---
+        var host = "public.cloud.shiftr.io";
         var port = 443;
-        var path = "/mqtt";
-        var clienteId = "unidad_" + Math.floor(Math.random() * 10000);
+        var clienteId = "unidad_bomberos_" + Math.floor(Math.random() * 10000);
 
-        var client = new Paho.MQTT.Client("wss://" + host + ":" + port + path, clienteId);
+        // La URL de conexión incluye el usuario 'public' y el password 'public'
+        var client = new Paho.MQTT.Client("wss://public:public@" + host + ":" + port, clienteId);
 
         client.onConnectionLost = function(responseObject) {
-            document.getElementById('header').innerText = "CONEXIÓN PERDIDA";
+            document.getElementById('header').innerText = "RECONECTANDO...";
             document.getElementById('header').style.background = "#555";
-            log("Conexión perdida. Reintentando...");
-            setTimeout(conectarCentral, 5000);
+            log("Conexión perdida: " + responseObject.errorMessage);
+            setTimeout(conectarCentral, 3000);
         };
 
         client.onMessageArrived = function(message) {
@@ -89,27 +89,44 @@
                 log("AVISO RECIBIDO: " + data.aviso);
                 navegarA(data.lat, data.lon, data.aviso);
             } catch(e) {
-                log("Error: Mensaje JSON inválido");
+                log("Error: Mensaje JSON no válido");
             }
         };
 
         function conectarCentral() {
-            log("Conectando a central...");
+            log("Intentando puente Shiftr...");
             client.connect({ 
                 useSSL: true,
-                timeout: 10,
+                timeout: 5,
                 keepAliveInterval: 30,
                 onSuccess: function() {
                     document.getElementById('header').innerText = "ESPERANDO SERVICIO";
                     document.getElementById('header').style.background = "#27ae60";
-                    log("CONECTADO A EMQX (443)");
+                    log("CONECTADO A BRIDGE (OK)");
                     client.subscribe("bomberos/unidad/B1");
                 },
                 onFailure: function(e) {
-                    log("Fallo: " + e.errorMessage);
+                    log("Fallo SSL: " + e.errorMessage);
+                    // Fallback a puerto inseguro si el seguro falla
+                    reintentarModoSimple();
+                }
+            });
+        }
+
+        function reintentarModoSimple() {
+            log("Probando modo simple (Puerto 80)...");
+            client = new Paho.MQTT.Client("ws://public:public@public.cloud.shiftr.io:80/mqtt", clienteId);
+            client.onMessageArrived = client.onMessageArrived; // Re-asignar handler
+            client.connect({
+                onSuccess: function() {
+                    document.getElementById('header').innerText = "ESPERANDO (MODO SIMPLE)";
+                    document.getElementById('header').style.background = "#f39c12";
+                    client.subscribe("bomberos/unidad/B1");
+                    log("Conectado por Puerto 80");
+                },
+                onFailure: function(err) {
+                    log("Error definitivo: " + err.errorMessage);
                     document.getElementById('header').innerText = "ERROR DE RED";
-                    document.getElementById('header').style.background = "#000";
-                    setTimeout(conectarCentral, 5000);
                 }
             });
         }
@@ -119,11 +136,10 @@
             var latlng = e.latlng;
             if (!userMarker) {
                 userMarker = L.marker(latlng, {icon: fireIcon}).addTo(map);
-                log("GPS: Señal fija");
+                log("GPS: Posición capturada");
                 map.setView(latlng, 18);
             } else {
                 userMarker.setLatLng(latlng);
-                // Si hay una ruta activa, actualizamos el punto de inicio (nuestra posición)
                 if (routingControl) {
                     routingControl.spliceWaypoints(0, 1, latlng);
                 }
@@ -136,30 +152,23 @@
             document.getElementById('header').style.background = "#c0392b";
             var destino = L.latLng(lat, lon);
 
-            // Limpiamos ruta anterior si existe
-            if (routingControl) {
-                map.removeControl(routingControl);
-            }
+            if (routingControl) map.removeControl(routingControl);
 
-            // Calculamos nueva ruta
             routingControl = L.Routing.control({
                 waypoints: [userMarker.getLatLng(), destino],
                 lineOptions: { styles: [{ color: '#3498db', weight: 8, opacity: 0.8 }] },
                 router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                createMarker: function() { return null; }, // No pines extra
-                addWaypoints: false,
-                draggableWaypoints: false
+                createMarker: function() { return null; },
+                addWaypoints: false
             }).addTo(map);
 
             map.flyTo(destino, 16);
-            
-            // Vibración (si el celular lo permite)
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
         }
 
         function toggleFollow() {
             followPlayer = !followPlayer;
-            log(followPlayer ? "Modo: Seguimiento" : "Modo: Mapa Libre");
+            log(followPlayer ? "Siguiendo GPS" : "Mapa desbloqueado");
         }
 
         function log(msg) {
@@ -167,16 +176,18 @@
             console.log(msg);
         }
 
-        // Iniciar servicios
         map.on('locationfound', onLocationFound);
         map.on('locationerror', function(e) { log("Error GPS: " + e.message); });
         
         map.locate({ setView: false, watch: true, enableHighAccuracy: true });
+        
+        // Arrancamos la conexión
         conectarCentral();
 
     </script>
 </body>
 </html>
+
 
 
 
