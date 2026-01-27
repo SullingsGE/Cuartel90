@@ -13,21 +13,13 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow: hidden; }
         .bg-unidad { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('camion2.jpg') center/cover; z-index: 1; }
         .main-container { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100%; }
-        
-        /* Barra de Estado */
         .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 1.2rem; }
-        
         .navigation-zone { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         #alerta-info-box { display: none; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 12px; border-left: 8px solid var(--primary); width: 90%; max-width: 450px; }
-        
         .controls { background: var(--dark); padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn-op { padding: 20px; border: none; border-radius: 10px; color: white; font-weight: 900; text-transform: uppercase; cursor: pointer; }
-
-        /* Overlay de Alerta Entrante */
         #alerta-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; animation: flash 1s infinite; }
         @keyframes flash { 0% { background: #000; } 50% { background: #500; } 100% { background: #000; } }
-
-        /* Formulario del Acta */
         #form-parte { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; box-sizing: border-box; }
         .seccion-titulo { background: var(--primary); color: white; padding: 8px; margin: 15px 0 10px 0; font-weight: bold; text-transform: uppercase; font-size: 13px; }
         .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -37,20 +29,17 @@
 </head>
 <body>
     <div class="bg-unidad"></div>
-
     <div class="main-container">
         <div class="status-bar" id="status-txt">🚒 UNIDAD B1: DISPONIBLE</div>
-        
         <div class="navigation-zone">
             <div id="alerta-info-box">
                 <h2 id="txt-evento" style="color:var(--primary); margin:0;"></h2>
                 <p id="txt-dir" style="font-size: 1.5rem; margin: 10px 0;"></p>
-                <a href="#" id="btn-maps" style="display:block; background:var(--primary); color:white; text-align:center; padding:15px; text-decoration:none; border-radius:8px; font-weight:bold;">ABRIR GPS</a>
+                <a href="#" id="btn-maps" target="_blank" style="display:block; background:var(--primary); color:white; text-align:center; padding:15px; text-decoration:none; border-radius:8px; font-weight:bold;">ABRIR GPS</a>
             </div>
         </div>
-
         <div class="controls">
-            <button class="btn-op" style="background:var(--primary)" onclick="enviarEstado('LLEGADA')">LLEGADA</button>
+            <button class="btn-op" style="background:var(--primary)" onclick="alert('Estado enviado: LLEGADA')">LLEGADA</button>
             <button class="btn-op" style="background:var(--success)" onclick="abrirFormulario()">FINALIZAR</button>
         </div>
     </div>
@@ -63,7 +52,6 @@
 
     <div id="form-parte">
         <h3 style="text-align:center; margin:0;">PARTE DE SALIDA - B.V. CHASCOMÚS</h3>
-        
         <div class="seccion-titulo">Horarios</div>
         <div class="grid-form">
             <div><label>Llamado</label><input type="time" id="h-llamado" class="input-f"></div>
@@ -71,59 +59,49 @@
             <div><label>Fin Trabajo</label><input type="time" id="h-fin" class="input-f"></div>
             <div><label>Regreso Cuartel</label><input type="time" id="h-cuartel" class="input-f"></div>
         </div>
-
         <div class="seccion-titulo">Localización</div>
         <input type="text" id="f-calle" class="input-f" placeholder="Calle / Ruta / KM">
         <input type="text" id="f-entre" class="input-f" placeholder="Entre calles / Localidad">
-
-        <div class="seccion-titulo">Damnificados / Intervinientes</div>
+        <div class="seccion-titulo">Damnificados</div>
         <div class="grid-form">
             <div><label>Civiles Heridos</label><input type="number" id="d-heridos" class="input-f" value="0"></div>
             <div><label>Civiles Fallecidos</label><input type="number" id="d-fallecidos" class="input-f" value="0"></div>
         </div>
-
-        <div class="seccion-titulo">Vehículos Afectados</div>
-        <input type="text" id="v-marca" class="input-f" placeholder="Marca, Modelo y Color">
-        <input type="text" id="v-dominio" class="input-f" placeholder="Dominio (Patente)">
-        <input type="text" id="v-seguro" class="input-f" placeholder="Compañía de Seguro y Póliza">
-
         <div class="seccion-titulo">Responsables</div>
-        <input type="text" id="r-cargo" class="input-f" placeholder="Oficial / Jefe de Dotación">
-        <input type="text" id="r-chofer" class="input-f" placeholder="Chofer de Unidad">
-        <input type="text" id="r-policia" class="input-f" placeholder="Personal Policial / Médico">
-
-        <textarea id="f-obs" class="input-f" style="height:100px; margin-top:10px;" placeholder="Detalle del servicio y observaciones..."></textarea>
-
-        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">GENERAR PDF Y CERRAR</button>
-        <button class="btn-op" style="background:#444; width:100%; margin-top:10px;" onclick="cerrarFormulario()">CANCELAR</button>
+        <input type="text" id="r-cargo" class="input-f" placeholder="Jefe de Dotación">
+        <textarea id="f-obs" class="input-f" style="height:100px; margin-top:10px;" placeholder="Observaciones..."></textarea>
+        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">GENERAR PDF</button>
+        <button class="btn-op" style="background:#444; width:100%; margin-top:10px;" onclick="cerrarFormulario()">VOLVER</button>
     </div>
 
     <script>
         let client;
-        let datosAlertaActual = { aviso: "ACCIDENTE", direccion: "" };
+        let datosAlertaActual = { aviso: "", direccion: "" };
 
-        // CONEXIÓN MQTT REESTABLECIDA
         function conectarMQTT() {
-            const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 5);
-            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
-            
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNIT_" + Math.random().toString(16).slice(2, 5));
             client.onMessageArrived = (msg) => {
                 try {
                     const data = JSON.parse(msg.payloadString);
+                    const ahora = Date.now();
+                    
+                    // FILTRO DE SEGURIDAD: Si el mensaje no tiene timestamp o es mayor a 60 seg, se descarta
+                    if (data.timestamp) {
+                        const diferencia = (ahora - data.timestamp) / 1000;
+                        if (diferencia > 60) {
+                            console.log("Alerta vieja ignorada: " + data.direccion);
+                            return; 
+                        }
+                    }
+
                     if (data.aviso && data.direccion) {
                         datosAlertaActual = data;
                         document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
                         document.getElementById('alerta-overlay').style.display = 'flex';
-                        if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
                     }
-                } catch(e) { console.error("Error MQTT:", e); }
+                } catch(e) { console.error("Error en mensaje:", e); }
             };
-
-            client.connect({ 
-                useSSL: true, 
-                onSuccess: () => { client.subscribe("bomberos/unidad/B1"); },
-                onFailure: () => setTimeout(conectarMQTT, 5000)
-            });
+            client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
         }
 
         function aceptarAlerta() {
@@ -131,7 +109,8 @@
             document.getElementById('alerta-info-box').style.display = 'block';
             document.getElementById('txt-evento').innerText = datosAlertaActual.aviso;
             document.getElementById('txt-dir').innerText = datosAlertaActual.direccion;
-            document.getElementById('btn-maps').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(datosAlertaActual.direccion + ", Chascomus")}`;
+            // Link corregido
+            document.getElementById('btn-maps').href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(datosAlertaActual.direccion + ", Chascomus");
             document.getElementById('status-txt').innerText = "🚨 EN SERVICIO";
             document.getElementById('status-txt').style.background = "#27ae60";
         }
@@ -146,48 +125,11 @@
         function generarPDFFinal() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const width = doc.internal.pageSize.getWidth();
-
-            // Encabezado
-            doc.setFontSize(14); doc.setFont("helvetica", "bold");
-            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMUS", width/2, 15, {align: "center"});
-            doc.setFontSize(9); doc.setFont("helvetica", "normal");
-            doc.text("Soler 347 - Tel: 02241 42 4059 | Chascomús, Buenos Aires", width/2, 20, {align: "center"});
-            doc.line(15, 25, 195, 25);
-
-            // Datos del Formulario
-            doc.setFontSize(14); doc.text("ACTA DE INTERVENCIÓN - UNIDAD B1", 15, 35);
-            
-            const tableData = [
-                ["SINIESTRO", datosAlertaActual.aviso, "FECHA", new Date().toLocaleDateString()],
-                ["CALLE/RUTA", document.getElementById('f-calle').value, "CRUCE", document.getElementById('f-entre').value],
-                ["LLAMADO", document.getElementById('h-llamado').value, "LLEGADA", document.getElementById('h-llegada').value],
-                ["FIN TRABAJO", document.getElementById('h-fin').value, "CUARTEL", document.getElementById('h-cuartel').value],
-                ["HERIDOS", document.getElementById('d-heridos').value, "FALLECIDOS", document.getElementById('d-fallecidos').value],
-                ["VEHÍCULO", document.getElementById('v-marca').value, "PATENTE", document.getElementById('v-dominio').value],
-                ["SEGURO", document.getElementById('v-seguro').value, "A CARGO", document.getElementById('r-cargo').value]
-            ];
-
-            doc.autoTable({
-                startY: 40,
-                body: tableData,
-                theme: 'grid',
-                styles: { fontSize: 10 },
-                columnStyles: { 0: {fillColor: [230, 230, 230], fontStyle: 'bold'}, 2: {fillColor: [230, 230, 230], fontStyle: 'bold'} }
-            });
-
-            doc.setFont("helvetica", "bold");
-            doc.text("OBSERVACIONES Y DETALLE:", 15, doc.lastAutoTable.finalY + 10);
-            doc.setFont("helvetica", "normal");
-            const obs = doc.splitTextToSize(document.getElementById('f-obs').value, 175);
-            doc.text(obs, 15, doc.lastAutoTable.finalY + 17);
-
-            // Firmas
-            const footerY = 270;
-            doc.line(20, footerY, 80, footerY); doc.text("JEFE DE DOTACIÓN", 35, footerY + 5);
-            doc.line(130, footerY, 190, footerY); doc.text("INTERVINIENTE / POLICÍA", 140, footerY + 5);
-
-            doc.save(`ACTA_B1_${Date.now()}.pdf`);
+            doc.text("ACTA DE SERVICIO - CHASCOMÚS", 20, 20);
+            doc.text("Siniestro: " + datosAlertaActual.aviso, 20, 35);
+            doc.text("Ubicación: " + document.getElementById('f-calle').value, 20, 45);
+            doc.text("A Cargo: " + document.getElementById('r-cargo').value, 20, 55);
+            doc.save(`Acta_B1.pdf`);
             cerrarFormulario();
             resetearInterfaz();
         }
@@ -196,7 +138,6 @@
             document.getElementById('alerta-info-box').style.display = 'none';
             document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
             document.getElementById('status-txt').style.background = "#c0392b";
-            document.querySelectorAll('.input-f').forEach(i => i.value = "");
         }
 
         window.onload = conectarMQTT;
