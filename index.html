@@ -6,158 +6,180 @@
     <title>UNIDAD B1 - SISTEMA INTEGRAL</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
     <style>
-        body { margin: 0; background: #0b0e11; color: white; font-family: sans-serif; }
-        /* Pestañas */
-        .tabs { display: flex; background: #15191d; border-bottom: 3px solid #e67e22; position: sticky; top: 0; z-index: 100; }
-        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; }
+        body { margin: 0; background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; }
+        .tabs { display: flex; background: #15191d; border-bottom: 3px solid #e67e22; sticky; top: 0; z-index: 100; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .tab-btn.active { color: #e67e22; border-bottom: 3px solid #e67e22; }
-        
-        .content { display: none; padding: 20px; }
+        .content { display: none; padding: 15px; }
         .content.active { display: block; }
 
-        /* Formulario Informe */
-        .form-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; font-size: 12px; color: #e67e22; margin-bottom: 5px; text-transform: uppercase; }
-        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #1a2229; color: white; box-sizing: border-box; }
+        /* Estilo Formulario */
+        .section-title { background: #e67e22; color: black; padding: 5px 10px; font-weight: bold; margin-top: 20px; font-size: 14px; text-transform: uppercase; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .form-group { margin-bottom: 10px; text-align: left; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
+        input, select, textarea { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #1a2229; color: white; box-sizing: border-box; }
         
-        .btn-action { width: 100%; padding: 20px; margin: 10px 0; border-radius: 8px; font-weight: bold; border: none; color: white; cursor: pointer; }
-        #btn-nav { background: #27ae60; font-size: 18px; text-decoration: none; display: inline-block; text-align: center; width: 93%; }
-        .btn-pdf { background: #e74c3c; }
+        .btn-action { width: 100%; padding: 20px; margin: 10px 0; border-radius: 8px; font-weight: bold; border: none; color: white; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('nav')">NAVEGACIÓN</button>
-        <button class="tab-btn" onclick="openTab('informe')">INFORME DE SERVICIO</button>
+        <button class="tab-btn active" onclick="openTab('nav')">Navegación</button>
+        <button class="tab-btn" onclick="openTab('informe')">Planilla Accidente</button>
     </div>
 
     <div id="nav" class="content active">
-        <div id="status-top" style="color: #f1c40f; margin-bottom: 10px;">ESPERANDO DESPACHO...</div>
-        <div id="card-emergencia" style="background: #1a2229; padding: 20px; border-radius: 10px; border-left: 5px solid #e67e22; display: none;">
-            <h2 id="txt-aviso">---</h2>
-            <p id="txt-hora"></p>
-            <a id="btn-nav" href="#">INICIAR VIAJE (GPS)</a>
-            <button class="btn-action" style="background: #2980b9;" onclick="registrarEvento('llegada')">REGISTRAR LLEGADA AL LUGAR</button>
+        <div id="card-emergencia" style="background: #1a2229; padding: 20px; border-radius: 10px; border-left: 5px solid #e67e22;">
+            <h2 id="txt-aviso">ESPERANDO DESPACHO...</h2>
+            <p id="txt-tiempos"></p>
+            <a id="btn-nav" href="#" class="btn-action" style="background: #27ae60; text-decoration: none; display: none;">INICIAR NAVEGACIÓN GPS</a>
+            <button class="btn-action" style="background: #2980b9;" onclick="marcar('llegada')">LLEGADA AL LUGAR</button>
+            <button class="btn-action" style="background: #8e44ad;" onclick="marcar('fin_trabajo')">FIN DE TRABAJO</button>
+            <button class="btn-action" style="background: #2c3e50;" onclick="marcar('cuartel')">LLEGADA AL CUARTEL</button>
         </div>
     </div>
 
     <div id="informe" class="content">
-        <h3 style="color: #e67e22; border-bottom: 1px solid #333;">PLANILLA DE ACCIDENTE</h3>
+        <div style="text-align: center; color: #e67e22; font-weight: bold;">SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS</div>
         
-        <div class="form-group">
-            <label>Tipo de Accidente</label>
-            <select id="f-tipo">
-                <option value="Tránsito">Tránsito</option>
-                <option value="Aéreo">Aéreo</option>
-                <option value="Embarcaciones">Embarcaciones</option>
-                <option value="Otro">Otro</option>
-            </select>
+        <div class="section-title">General y Horarios</div>
+        <div class="grid">
+            <div class="form-group"><label>Fecha</label><input type="date" id="f_fecha"></div>
+            <div class="form-group"><label>Tipo (Aéreo/Trans/Emb/Otro)</label><input type="text" id="f_tipo"></div>
+            <div class="form-group"><label>H. Llamado</label><input type="time" id="f_h_llamado"></div>
+            <div class="form-group"><label>H. Llegada</label><input type="time" id="f_h_llegada"></div>
+            <div class="form-group"><label>H. Fin Trabajo</label><input type="time" id="f_h_fin"></div>
+            <div class="form-group"><label>H. Cuartel</label><input type="time" id="f_h_cuartel"></div>
         </div>
 
-        <div class="form-group">
-            <label>Localización (Calle/Ruta y Km)</label>
-            <input type="text" id="f-ubicacion" placeholder="Ej: Ruta 2 Km 120">
+        <div class="section-title">Localización</div>
+        <div class="form-group"><label>Calle / Ruta</label><input type="text" id="f_calle"></div>
+        <div class="grid">
+            <div class="form-group"><label>Nº / KM</label><input type="text" id="f_km"></div>
+            <div class="form-group"><label>Tipo Zona</label>
+                <select id="f_zona"><option value="Urbana">Urbana</option><option value="Rural">Rural</option></select>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>Clima</label>
-            <select id="f-clima">
-                <option value="Soleado">Soleado</option>
-                <option value="Lluvia">Lluvia</option>
-                <option value="Neblina">Neblina</option>
-                <option value="Noche">Noche</option>
-            </select>
+        <div class="section-title">Datos del Solicitante</div>
+        <div class="grid">
+            <div class="form-group"><label>Nombre y Apellido</label><input type="text" id="f_sol_nombre"></div>
+            <div class="form-group"><label>Teléfono / DNI</label><input type="text" id="f_sol_dni"></div>
         </div>
 
-        <div class="form-group">
-            <label>Víctimas (Heridos/Fallecidos)</label>
-            <textarea id="f-damnificados" rows="2" placeholder="Detalle de personas..."></textarea>
+        <div class="section-title">Víctimas y Seguros</div>
+        <div class="grid">
+            <div class="form-group"><label>Heridos</label><input type="number" id="f_heridos" value="0"></div>
+            <div class="form-group"><label>Fallecidos</label><input type="number" id="f_fallecidos" value="0"></div>
+            <div class="form-group"><label>Compañía Seguro</label><input type="text" id="f_seguro"></div>
+            <div class="form-group"><label>Nº Póliza</label><input type="text" id="f_poliza"></div>
         </div>
 
-        <div class="form-group">
-            <label>Observaciones / Vehículos</label>
-            <textarea id="f-obs" rows="4" placeholder="Dominio, Marca, Modelo..."></textarea>
-        </div>
+        <div class="section-title">Observaciones y Vehículos</div>
+        <textarea id="f_obs" rows="5" placeholder="Detalle vehículos, dominios y tareas realizadas..."></textarea>
 
-        <button class="btn-action btn-pdf" onclick="generarPDF()">GENERAR PLANILLA PDF</button>
+        <button class="btn-action" style="background: #e74c3c;" onclick="generarPDFCompleto()">GENERAR PDF ORIGINAL</button>
     </div>
 
     <script>
-        // Lógica de Pestañas
-        function openTab(tabId) {
+        function openTab(id) {
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
+            document.getElementById(id).classList.add('active');
             event.currentTarget.classList.add('active');
         }
 
-        // MQTT y Navegación
+        // --- Lógica MQTT y Navegación ---
         var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
-        var horaLlamado = "";
-
-        client.onMessageArrived = function(msg) {
+        client.onMessageArrived = (msg) => {
             var data = JSON.parse(msg.payloadString);
-            horaLlamado = new Date().toLocaleTimeString();
-            document.getElementById("status-top").innerText = "SERVICIO EN CURSO";
-            document.getElementById("card-emergencia").style.display = "block";
             document.getElementById("txt-aviso").innerText = data.aviso;
-            document.getElementById("txt-hora").innerText = "Llamado: " + horaLlamado;
+            document.getElementById("f_calle").value = data.aviso;
+            document.getElementById("f_h_llamado").value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             document.getElementById("btn-nav").href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
-            
-            // Auto-completar ubicación en el informe
-            document.getElementById("f-ubicacion").value = data.aviso;
+            document.getElementById("btn-nav").style.display = "block";
         };
+        client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
 
-        function registrarEvento(tipo) {
-            var hora = new Date().toLocaleTimeString();
-            client.send(new Paho.MQTT.Message(JSON.stringify({evento: tipo, hora: hora})), "bomberos/unidad/B1/estado");
-            alert("Evento '" + tipo + "' registrado a las " + hora);
+        function marcar(evento) {
+            let h = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            if(evento === 'llegada') document.getElementById("f_h_llegada").value = h;
+            if(evento === 'fin_trabajo') document.getElementById("f_h_fin").value = h;
+            if(evento === 'cuartel') document.getElementById("f_h_cuartel").value = h;
+            client.send(new Paho.MQTT.Message(JSON.stringify({evento: evento, hora: h})), "bomberos/unidad/B1/estado");
         }
 
-        // GENERACIÓN DE PDF PROFESIONAL
-        function generarPDF() {
+        // --- GENERACIÓN DEL PDF IDENTICO AL ORIGINAL ---
+        function generarPDFCompleto() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const f = (id) => document.getElementById(id).value;
+            const g = (id) => document.getElementById(id).value;
 
-            // Encabezado según planilla oficial 
-            doc.setFontSize(14);
-            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMUS", 10, 20);
-            doc.setFontSize(10);
-            doc.text("Fundada el 19 de Noviembre de 1960 - Soler 347", 10, 26);
-            
-            doc.line(10, 30, 200, 30);
+            // Encabezado
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 10, 15);
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text("Fundada el 19 de Noviembre de 1960", 10, 20);
+            doc.text("Soler 347 - Tel: 02241 42 4059 - Chascomús", 10, 24);
+            doc.line(10, 26, 200, 26);
+
             doc.setFontSize(16);
-            doc.text("INFORME DE ACCIDENTE", 70, 40);
-
-            // Datos del Informe [cite: 8, 9, 14, 41]
-            doc.setFontSize(12);
-            doc.text(`TIPO: ${f('f-tipo')}`, 10, 55);
-            doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 130, 55);
-            doc.text(`HORA LLAMADO: ${horaLlamado}`, 10, 65);
-            doc.text(`LOCALIZACIÓN: ${f('f-ubicacion')}`, 10, 75);
-            doc.text(`CLIMA: ${f('f-clima')}`, 10, 85);
-
-            doc.text("DAMNIFICADOS:", 10, 100);
+            doc.setFont("helvetica", "bold");
+            doc.text("ACCIDENTE", 85, 35);
+            
             doc.setFontSize(10);
-            doc.text(doc.splitTextToSize(f('f-damnificados'), 180), 10, 107);
+            doc.text(`Fecha: ${g('f_fecha')}`, 10, 45);
+            doc.text(`Tipo: ${g('f_tipo')}`, 140, 45);
 
-            doc.setFontSize(12);
-            doc.text("OBSERVACIONES Y VEHÍCULOS:", 10, 130);
+            // Cuadrícula de Horarios
+            doc.rect(10, 50, 190, 25);
+            doc.text("HORARIOS", 12, 55);
+            doc.setFontSize(8);
+            doc.text(`LLAMADO: ${g('f_h_llamado')}`, 15, 62);
+            doc.text(`LLEGADA LUGAR: ${g('f_h_llegada')}`, 60, 62);
+            doc.text(`FIN TRABAJO: ${g('f_h_fin')}`, 110, 62);
+            doc.text(`LLEGADA CUARTEL: ${g('f_h_cuartel')}`, 155, 62);
+
+            // Localización
             doc.setFontSize(10);
-            doc.text(doc.splitTextToSize(f('f-obs'), 180), 10, 137);
+            doc.text("LOCALIZACIÓN", 10, 85);
+            doc.rect(10, 87, 190, 20);
+            doc.text(`Calle/Ruta: ${g('f_calle')}`, 15, 93);
+            doc.text(`KM/Nº: ${g('f_km')}`, 120, 93);
+            doc.text(`Tipo Zona: ${g('f_zona')}`, 15, 101);
 
-            // Firmas [cite: 55]
-            doc.line(20, 260, 80, 260);
-            doc.text("JEFE DE DOTACIÓN", 35, 265);
+            // Solicitante y Seguro
+            doc.text("SOLICITANTE / SEGURO", 10, 115);
+            doc.rect(10, 117, 190, 20);
+            doc.text(`Nombre: ${g('f_sol_nombre')}`, 15, 123);
+            doc.text(`Doc/Tel: ${g('f_sol_dni')}`, 110, 123);
+            doc.text(`Seguro: ${g('f_seguro')} - Póliza: ${g('f_poliza')}`, 15, 131);
 
-            doc.save(`Informe_B1_${Date.now()}.pdf`);
+            // Víctimas
+            doc.text("PERSONAS DAMNIFICADAS", 10, 145);
+            doc.rect(10, 147, 190, 15);
+            doc.text(`Heridos: ${g('f_heridos')}`, 15, 156);
+            doc.text(`Fallecidos: ${g('f_fallecidos')}`, 60, 156);
+
+            // Observaciones
+            doc.text("OBSERVACIONES / VEHÍCULOS AFECTADOS", 10, 170);
+            doc.rect(10, 172, 190, 80);
+            var splitObs = doc.splitTextToSize(g('f_obs'), 180);
+            doc.text(splitObs, 15, 178);
+
+            // Firmas
+            doc.line(30, 280, 80, 280);
+            doc.text("Jefe de Dotación", 42, 285);
+            doc.line(130, 280, 180, 280);
+            doc.text("Operador Central", 142, 285);
+
+            doc.save(`Planilla_Accidente_${g('f_fecha')}.pdf`);
         }
-
-        client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
     </script>
 </body>
 </html>
