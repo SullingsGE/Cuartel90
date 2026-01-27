@@ -2,196 +2,157 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>UNIDAD B1 - SISTEMA INTEGRAL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UNIDAD B1 - CHASCOMÚS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; --input: #1a2229; --success: #27ae60; }
+        :root { --primary: #e67e22; --danger: #c0392b; --success: #27ae60; --dark: rgba(10, 10, 10, 0.85); }
         
-        body { margin: 0; background: var(--dark); color: white; font-family: 'Segoe UI', Roboto, sans-serif; }
-        
-        /* Botón Volver al Menú */
-        .btn-back { position: fixed; top: 60px; right: 15px; z-index: 200; background: #333; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 0.7rem; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow: hidden; }
 
-        /* Navegación por pestañas */
-        .tabs { display: flex; background: var(--card); border-bottom: 3px solid var(--primary); position: sticky; top: 0; z-index: 100; }
-        .tab-btn { flex: 1; padding: 15px 5px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
-        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-
-        .content { display: none; padding: 15px; box-sizing: border-box; }
-        .content.active { display: block; }
-
-        /* Contenedor de Alerta */
-        .alert-card { background: var(--card); padding: 20px; border-radius: 10px; border-left: 5px solid var(--primary); margin-bottom: 20px; }
-        #txt-aviso { margin: 0; font-size: 1.4rem; text-transform: uppercase; color: var(--primary); }
-        #txt-dir-alerta { color: #aaa; margin: 10px 0; font-size: 1rem; }
-
-        /* BOTONERA UNIFORME */
-        .grid-buttons { display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%; }
-        
-        .btn-action { 
-            width: 100%; 
-            padding: 15px; 
-            border-radius: 8px; 
-            font-weight: bold; 
-            border: none; 
-            color: white; 
-            cursor: pointer; 
-            font-size: 1rem; 
-            text-transform: uppercase;
-            box-sizing: border-box;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-            min-height: 55px;
+        /* FONDO CON FOTO REAL */
+        .bg-unidad {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('camion2.jpg');
+            background-size: cover; background-position: center;
+            z-index: 1;
         }
 
-        /* Colores específicos */
-        .btn-nav { background: var(--success); }
-        .btn-llegada { background: #2980b9; }
-        .btn-fin { background: #8e44ad; }
-        .btn-cuartel { background: #34495e; }
-        .btn-pdf { background: #e74c3c; margin-top: 20px; }
+        /* CAPA OPERATIVA */
+        .main-container {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; height: 100%;
+        }
 
-        /* Estilos del Formulario Planilla */
-        .section-title { background: var(--primary); color: black; padding: 8px 12px; font-weight: bold; margin: 20px 0 10px 0; font-size: 0.9rem; text-transform: uppercase; border-radius: 4px; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; text-transform: uppercase; }
-        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: var(--input); color: white; box-sizing: border-box; font-size: 1rem; }
-        textarea { resize: vertical; }
+        /* Barra Superior */
+        .status-bar {
+            background: var(--danger); color: white; padding: 10px;
+            text-align: center; font-weight: bold; font-size: 1.2rem;
+            letter-spacing: 1px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
 
-        @media (max-width: 480px) {
-            .form-grid { grid-template-columns: 1fr; }
-            #txt-aviso { font-size: 1.2rem; }
+        /* Área de Mapa */
+        #map-unidad { flex-grow: 1; width: 100%; background: #1a1a1a; }
+
+        /* Panel de Alerta (Se activa cuando llega despacho) */
+        #alerta-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 5000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            animation: flash red 1s infinite;
+        }
+        @keyframes flash { 0% { background: rgba(0,0,0,0.9); } 50% { background: rgba(192, 57, 43, 0.5); } 100% { background: rgba(0,0,0,0.9); } }
+
+        /* Botonera Inferior */
+        .controls {
+            background: var(--dark); padding: 15px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+
+        .btn-op {
+            padding: 20px; border: none; border-radius: 8px; color: white;
+            font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer;
+        }
+        .btn-llegada { background: var(--primary); }
+        .btn-finalizar { background: var(--success); }
+
+        /* Notificación Toast */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--success); padding: 15px 30px; border-radius: 50px;
+            font-weight: bold; z-index: 6000; display: none; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
-    <a href="index.html" class="btn-back">« MENU</a>
+    <div class="bg-unidad"></div>
+    <div id="toast" class="toast">✅ MENSAJE ENVIADO A CENTRAL</div>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('nav')">Navegación</button>
-        <button class="tab-btn" onclick="openTab('informe')">Planilla</button>
-    </div>
+    <div class="main-container">
+        <div class="status-bar" id="status-txt">UNIDAD B1: ESPERANDO DESPACHO</div>
+        
+        <div id="map-unidad"></div>
 
-    <div id="nav" class="content active">
-        <div class="alert-card">
-            <h2 id="txt-aviso">ESPERANDO...</h2>
-            <div id="txt-dir-alerta">No hay servicios activos</div>
-        </div>
-
-        <div class="grid-buttons">
-            <a id="btn-nav" href="#" class="btn-action btn-nav" style="display: none;" onclick="limpiarAlerta()">MAPA GPS</a>
-            <button class="btn-action btn-llegada" onclick="marcar('llegada')">Llegada al Lugar</button>
-            <button class="btn-action btn-fin" onclick="marcar('fin_trabajo')">Fin de Trabajo</button>
-            <button class="btn-action btn-cuartel" onclick="marcar('cuartel')">Llegada al Cuartel</button>
+        <div class="controls">
+            <button class="btn-op btn-llegada" onclick="enviarEstado('LLEGADA AL LUGAR')">LLEGADA AL LUGAR</button>
+            <button class="btn-op btn-finalizar" onclick="enviarEstado('SERVICIO FINALIZADO')">FINALIZAR Y RETORNAR</button>
         </div>
     </div>
 
-    <div id="informe" class="content">
-        <div class="section-title">Datos del Siniestro</div>
-        <div class="form-grid">
-            <div class="form-group"><label>Fecha</label><input type="date" id="f_fecha"></div>
-            <div class="form-group"><label>Hora Llamado</label><input type="time" id="f_h_llamado"></div>
-        </div>
-        <label>Ubicación / Calle</label>
-        <input type="text" id="f_calle" placeholder="Ej: Calle 123">
-
-        <div class="section-title">Tiempos Registrados</div>
-        <div class="form-grid">
-            <div class="form-group"><label>Llegada</label><input type="time" id="f_h_llegada"></div>
-            <div class="form-group"><label>Fin Trabajo</label><input type="time" id="f_h_fin"></div>
-        </div>
-
-        <div class="section-title">Observaciones</div>
-        <textarea id="f_obs" rows="4" placeholder="Detalle del servicio y vehículos intervinientes..."></textarea>
-
-        <button class="btn-action btn-pdf" onclick="generarPDFOriginal()">Generar PDF Oficial</button>
+    <div id="alerta-overlay" onclick="aceptarAlerta()">
+        <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ENTRANTE ⚠️</h1>
+        <div id="alerta-info" style="text-align: center; margin: 30px; font-size: 1.5rem;"></div>
+        <button class="btn-op" style="background: white; color: black; padding: 20px 50px;">RECIBIDO / IR AL MAPA</button>
     </div>
 
     <script>
-        function openTab(id) {
-            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            event.currentTarget.classList.add('active');
+        let map, marker, client;
+
+        function mostrarToast(txt) {
+            const t = document.getElementById('toast');
+            t.innerText = txt; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
         }
 
-        var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
-        
-        client.onMessageArrived = (msg) => {
-            var data = JSON.parse(msg.payloadString);
-            
-            // FILTRO DE TIEMPO: Solo procesa si la alerta tiene menos de 45 segundos
-            let ahora = Date.now();
-            let diferencia = ahora - (data.timestamp || 0);
+        function conectarMQTT() {
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNID_" + Math.random().toString(16).slice(2, 5));
+            client.onMessageArrived = (msg) => {
+                const data = JSON.parse(msg.payloadString);
+                const info = `🚑 EVENTO: ${data.aviso}<br>📍 DIR: ${data.direccion}`;
+                document.getElementById('alerta-info').innerHTML = info;
+                document.getElementById('alerta-overlay').style.display = 'flex';
+                actualizarMapa(data.lat, data.lon);
+            };
 
-            if (data.aviso && diferencia < 45000) {
-                document.getElementById("txt-aviso").innerText = data.aviso;
-                document.getElementById("txt-dir-alerta").innerText = data.direccion;
-                
-                document.getElementById("f_calle").value = data.direccion;
-                document.getElementById("f_fecha").value = new Date().toISOString().split('T')[0];
-                document.getElementById("f_h_llamado").value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            client.connect({ useSSL: true, onSuccess: () => {
+                client.subscribe("bomberos/unidad/B1");
+                console.log("Conectado a Central");
+            }});
+        }
 
-                var navBtn = document.getElementById("btn-nav");
-                navBtn.href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
-                navBtn.style.display = "flex";
-                
-                new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+        function aceptarAlerta() {
+            document.getElementById('alerta-overlay').style.display = 'none';
+            document.getElementById('status-txt').innerText = "EN SERVICIO ACTIVAMENTE";
+            document.getElementById('status-txt').style.background = "#27ae60";
+        }
+
+        function enviarEstado(estado) {
+            if (client && client.isConnected()) {
+                const msg = new Paho.MQTT.Message(JSON.stringify({ 
+                    unidad: "B1", 
+                    estado: estado, 
+                    time: new Date().toLocaleTimeString() 
+                }));
+                msg.destinationName = "bomberos/central/reportes";
+                client.send(msg);
+                mostrarToast("✅ " + estado + " REGISTRADO");
+                if(estado === 'SERVICIO FINALIZADO') {
+                    document.getElementById('status-txt').innerText = "UNIDAD B1: DISPONIBLE";
+                    document.getElementById('status-txt').style.background = "#c0392b";
+                }
             }
-        };
-
-        client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
-
-        function limpiarAlerta() {
-            // Espera un momento para que el navegador procese el link GPS y luego limpia
-            setTimeout(() => {
-                document.getElementById("txt-aviso").innerText = "ESPERANDO...";
-                document.getElementById("txt-dir-alerta").innerText = "No hay servicios activos";
-                document.getElementById("btn-nav").style.display = "none";
-            }, 5000);
         }
 
-        function marcar(evento) {
-            let h = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            if(evento === 'llegada') document.getElementById("f_h_llegada").value = h;
-            if(evento === 'fin_trabajo') document.getElementById("f_h_fin").value = h;
-            client.send(new Paho.MQTT.Message(JSON.stringify({evento: evento, hora: h})), "bomberos/unidad/B1/estado");
-            alert("Hora de " + evento + " registrada: " + h);
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map-unidad"), {
+                zoom: 15, center: { lat: -35.576, lng: -58.010 },
+                disableDefaultUI: true,
+                styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
+            });
+            conectarMQTT();
         }
 
-        function generarPDFOriginal() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const val = (id) => document.getElementById(id).value;
-            doc.setFont("helvetica", "bold");
-            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 10, 15);
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text("Fundada el 19 de Noviembre de 1960 | Soler 347", 10, 22);
-            doc.line(10, 25, 200, 25);
-            doc.setFontSize(14);
-            doc.text("INFORME DE SERVICIO", 80, 35);
-            doc.setFontSize(11);
-            doc.text("FECHA: " + val('f_fecha'), 10, 50);
-            doc.text("UBICACIÓN: " + val('f_calle'), 10, 60);
-            doc.rect(10, 65, 190, 30);
-            doc.text("HORARIOS", 15, 72);
-            doc.setFontSize(9);
-            doc.text("Llamado: " + val('f_h_llamado'), 15, 80);
-            doc.text("Llegada: " + val('f_h_llegada'), 70, 80);
-            doc.text("Fin de Trabajo: " + val('f_h_fin'), 130, 80);
-            doc.setFontSize(11);
-            doc.text("OBSERVACIONES / VEHÍCULOS:", 10, 105);
-            doc.rect(10, 107, 190, 80);
-            var splitObs = doc.splitTextToSize(val('f_obs'), 180);
-            doc.text(splitObs, 15, 115);
-            doc.save("Informe_" + val('f_fecha') + ".pdf");
+        function actualizarMapa(lat, lon) {
+            const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
+            if (marker) marker.setMap(null);
+            marker = new google.maps.Marker({ position: pos, map: map, animation: google.maps.Animation.BOUNCE });
+            map.panTo(pos);
+            map.setZoom(17);
         }
     </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0_KPxSHGYgf-ewC3Cha0yH-ey8-up9ds&callback=initMap" async defer></script>
 </body>
 </html>
