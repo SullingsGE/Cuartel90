@@ -2,103 +2,81 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>MONITOR CENTRAL - B1 CHASCOMÚS</title>
+    <title>MONITOR REMOTO B1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; color: white; font-family: 'Arial Black', sans-serif; overflow: hidden; }
         
-        /* FONDO DINÁMICO */
-        .bg {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: url('cuartel.jpg') no-repeat center; background-size: cover;
-            filter: brightness(0.2); z-index: 1;
-        }
-
-        /* CUADRO DE ALERTA GIGANTE */
-        #alert-screen {
-            position: relative; z-index: 10; height: 100vh;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(0,0,0,0.8); border: 20px solid #e67e22; box-sizing: border-box;
-            animation: flash-border 0.5s infinite;
-        }
-
-        @keyframes flash-border { 0% { border-color: #e67e22; } 50% { border-color: #ff0000; } 100% { border-color: #e67e22; } }
-
-        .title { font-size: 6vw; color: #ff0000; text-transform: uppercase; margin: 0; text-shadow: 0 0 30px #ff0000; }
-        .tipo { font-size: 8vw; color: #fff; text-transform: uppercase; margin: 20px 0; text-align: center; }
-        .direccion { font-size: 4vw; color: #f1c40f; text-align: center; }
-        
-        .timer { position: absolute; bottom: 40px; right: 40px; font-size: 3vw; color: #555; }
-
+        /* ESTADO DE ESPERA: Imagen que se ve siempre */
         #standby {
-            position: relative; z-index: 10; height: 100vh;
+            position: fixed; width: 100%; height: 100%;
+            background: url('cuartel.jpg') no-repeat center center;
+            background-size: cover;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1;
         }
+        #standby img { width: 300px; filter: drop-shadow(0 0 20px rgba(0,0,0,1)); }
+        #standby h1 { font-size: 40px; text-shadow: 2px 2px 10px #000; opacity: 0.8; margin-top: 20px; }
+
+        /* ESTADO DE ALERTA: Se activa al recibir despacho */
+        #alerta {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 10;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            border: 30px solid #e67e22; box-sizing: border-box;
+            animation: border-pulse 1s infinite;
+        }
+
+        @keyframes border-pulse { 0% { border-color: #e67e22; } 50% { border-color: #ff0000; } 100% { border-color: #e67e22; } }
+
+        .txt-aviso { font-size: 10vw; color: #ff3333; text-transform: uppercase; margin: 0; text-align: center; line-height: 1; }
+        .txt-calle { font-size: 5vw; color: #fff; margin-top: 40px; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="bg"></div>
-
 <div id="standby">
-    <img src="escudo.png" style="width: 20vw; opacity: 0.5;">
-    <h1 style="color: rgba(255,255,255,0.2); font-size: 3vw;">SISTEMA DE ALERTA B1 - EN ESPERA</h1>
+    <img src="escudo.png" alt="Escudo">
+    <h1>SISTEMA DE DESPACHO B1 - CHASCOMÚS</h1>
 </div>
 
-<div id="alert-screen">
-    <p class="title">🚨 SALIDA DE EMERGENCIA 🚨</p>
-    <div id="display-tipo" class="tipo">INCENDIO</div>
-    <div id="display-dir" class="direccion">CALLE LIBRE 123</div>
-    <div class="timer" id="clock">00:00</div>
-    <audio id="sirena" src="https://www.soundjay.com/buttons/beep-01a.mp3"></audio>
+<div id="alerta">
+    <p style="font-size: 3vw; color: #aaa; letter-spacing: 10px; margin: 0;">SALIDA DE EMERGENCIA</p>
+    <h1 id="display-tipo" class="txt-aviso">TIPO</h1>
+    <h2 id="display-calle" class="txt-calle">CALLE</h2>
+    <button onclick="resetMonitor()" style="margin-top: 50px; padding: 15px 40px; font-size: 20px; cursor: pointer;">LIMPIAR PANTALLA</button>
 </div>
 
 <script>
     let client;
-    let timerInterval;
 
     function conectar() {
-        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_TV_" + Math.random().toString(16).slice(2, 5));
+        // Generamos un ID de cliente único para el monitor
+        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_MONITOR_" + Math.random().toString(16).slice(2, 5));
         
         client.onMessageArrived = (msg) => {
             const data = JSON.parse(msg.payloadString);
-            if(data.aviso) dispararAlerta(data);
+            mostrarAlerta(data);
         };
 
         client.connect({ useSSL: true, onSuccess: () => {
             client.subscribe("bomberos/unidad/B1");
-            console.log("Monitor Conectado");
+            console.log("Monitor HDMI conectado y esperando...");
         }});
     }
 
-    function dispararAlerta(data) {
-        document.getElementById('standby').style.display = 'none';
-        document.getElementById('alert-screen').style.display = 'flex';
-        
+    function mostrarAlerta(data) {
+        document.getElementById('alerta').style.display = 'flex';
         document.getElementById('display-tipo').innerText = data.aviso;
-        document.getElementById('display-dir').innerText = data.direccion;
+        document.getElementById('display-calle').innerText = data.direccion;
         
-        // Iniciar Sirena
-        const audio = document.getElementById('sirena');
+        // Opcional: Sonido de alerta
+        const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
         audio.play();
+    }
 
-        // Cronómetro de salida
-        let seg = 0;
-        if(timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            seg++;
-            let m = Math.floor(seg / 60);
-            let s = seg % 60;
-            document.getElementById('clock').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-        }, 1000);
-
-        // Auto-cerrar después de 5 minutos para volver al standby
-        setTimeout(() => {
-            document.getElementById('standby').style.display = 'flex';
-            document.getElementById('alert-screen').style.display = 'none';
-            audio.pause();
-            audio.currentTime = 0;
-        }, 300000); 
+    function resetMonitor() {
+        document.getElementById('alerta').style.display = 'none';
     }
 
     window.onload = conectar;
