@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Navegador Táctico - Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <style>
+        body { margin: 0; padding: 0; background: #1a1a1a; }
+        #map { height: 100vh; width: 100vw; }
+        #header {
+            position: absolute; top: 0; width: 100%; z-index: 1000;
+            background: rgba(192, 57, 43, 0.9); color: white;
+            text-align: center; padding: 10px 0; font-family: sans-serif;
+            font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        #controls {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .btn {
+            background: white; border: none; padding: 15px;
+            border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            font-size: 20px; width: 55px; height: 55px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">UNIDAD DE PRUEBA: SEGUIMIENTO ACTIVO</div>
+    
+    <div id="controls">
+        <button class="btn" onclick="toggleFollow()">📍</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        var map = L.map('map', { zoomControl: false }).setView([0, 0], 18);
+        var followPlayer = true;
+        var userMarker, routingControl;
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Icono personalizado para el vehículo/bombero
+        var fireIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div style='background-color:#e74c3c; width:15px; height:15px; border-radius:50%; border:3px solid white;'></div>",
+            iconSize: [20, 20], iconAnchor: [10, 10]
+        });
+
+        function onLocationFound(e) {
+            var radius = e.accuracy / 2;
+            var latlng = e.latlng;
+
+            if (!userMarker) {
+                userMarker = L.marker(latlng, {icon: fireIcon}).addTo(map);
+                // SIMULACIÓN: Creamos un destino a 300 metros al norte para probar la ruta
+                var destLat = latlng.lat + 0.003;
+                var destLng = latlng.lng + 0.003;
+
+                routingControl = L.Routing.control({
+                    waypoints: [latlng, L.latLng(destLat, destLng)],
+                    lineOptions: { styles: [{ color: '#2980b9', weight: 7 }] },
+                    createMarker: function() { return null; }, // No mostrar pines de A y B
+                    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' })
+                }).addTo(map);
+            } else {
+                userMarker.setLatLng(latlng);
+                routingControl.spliceWaypoints(0, 1, latlng); // Actualiza punto de inicio
+            }
+
+            if (followPlayer) {
+                map.setView(latlng, 18);
+            }
+        }
+
+        function toggleFollow() {
+            followPlayer = !followPlayer;
+            alert(followPlayer ? "Seguimiento activado" : "Mapa libre");
+        }
+
+        map.on('locationfound', onLocationFound);
+        map.locate({ setView: true, watch: true, enableHighAccuracy: true });
+    </script>
+</body>
+</html>
