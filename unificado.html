@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>SISTEMA CENTRAL B1 - CHASCOMÚS</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--dark); height: 100vh; overflow: hidden; color: white; }
+        
+        .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
+        .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
+
+        .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; background: var(--dark); transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; display: flex; }
+        .full-panel.active { left: 0; }
+        
+        #map-full { flex-grow: 1; height: 100%; }
+        #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; }
+        
+        #bitacora-content { width: 100%; padding: 40px 40px 40px 80px; box-sizing: border-box; display: flex; flex-direction: column; height: 100%; }
+        #historial-bit { flex-grow: 1; background: #000; overflow-y: auto; margin: 20px 0; padding: 20px; border-radius: 8px; border: 1px solid #333; }
+        
+        .close-btn { position: absolute; top: 20px; right: 30px; font-size: 40px; color: white; cursor: pointer; z-index: 1100; background: none; border: none; }
+        .input-std { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .btn-tipo { width: 100%; padding: 12px; margin-bottom: 8px; border: 2px solid transparent; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; opacity: 0.5; transition: 0.3s; text-align: left; }
+        .btn-tipo.selected { opacity: 1; border-color: white; transform: scale(1.02); }
+        
+        .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; }
+        .btn-rescate { background: #2980b9; }
+        .btn-accidente { background: #f1c40f; color: #000; }
+        .btn-incendio { background: #c0392b; }
+        
+        .log-entry { border-left: 4px solid var(--primary); background: #1a1e23; padding: 12px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="handle-container">
+    <div class="drawer-handle" onclick="abrirPanel('panel-despacho')">DESPACHO</div>
+    <div class="drawer-handle" onclick="abrirPanel('panel-bitacora')">LIBRO DE GUARDIA</div>
+</div>
+
+<div id="panel-despacho" class="full-panel">
+    <button class="close-btn" onclick="cerrarPaneles()">×</button>
+    <div id="map-full"></div>
+    <div id="despacho-control">
+        <h2 style="color:var(--primary); margin-top: 40px;">CENTRAL B1</h2>
+        <input id="pac-input" class="input-std" type="text" placeholder="Calle o Ruta en Chascomús...">
+        <div style="margin: 20px 0;">
+            <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE ACUATICO')">RESCATE ACUATICO</button>
+            <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE TECNICO')">RESCATE TECNICO</button>
+            <button class="btn-tipo btn-accidente" onclick="seleccionar(this, 'ACCIDENTE VIAL')">ACCIDENTE VIAL</button>
+            <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO FORESTAL')">INCENDIO FORESTAL</button>
+            <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO ESTRUCTURAL')">INCENDIO ESTRUCTURAL</button>
+        </div>
+        <button class="btn-action" onclick="ejecutarDespacho()">ENVIAR ALERTA</button>
+        <p id="mqtt-status" style="font-size:11px; color:#e74c3c; text-align:center; margin-top:15px;">CONECTANDO...</p>
+    </div>
+</div>
+
+<div id="panel-bitacora" class="full-panel">
+    <button class="close-btn" onclick="cerrarPaneles()">×</button>
+    <div id="bitacora-content">
+        <h2 style="color:var(--primary); text-align: center;">LIBRO DE GUARDIA DIGITAL</h2>
+        <div id="bit-login" style="max-width: 400px; margin: 50px auto; text-align: center; background: var(--card); padding: 30px; border-radius: 12px; border: 1px solid #333;">
+            <input type="text" id="u-bit" class="input-std" placeholder="Usuario">
+            <input type="password" id="p-bit" class="input-std" placeholder="Contraseña">
+            <button class="btn-action" onclick="loginBitacora()" style="margin-top:15px;">INGRESAR</button>
+        </div>
+        <div id="bit-ui" style="display:none; height: 100%; flex-direction: column;">
+            <div id="historial-bit"></div>
+            <div style="display:flex; gap:15px; align-items: flex-end;">
+                <textarea id="text-novedad" class="input-std" style="height:120px; resize:none; flex-grow:1;" placeholder="Escriba la novedad..."></textarea>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button class="btn-action" style="width:180px; height:50px; font-size:14px;" onclick="guardarNovedad()">REGISTRAR</button>
+                    <button class="btn-action" style="width:180px; height:45px; font-size:12px; background:#34495e;" onclick="exportarPDF()">DESCARGAR SEMANA</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let map, marker, client, lat, lon, tipoSeleccionado = "";
+    let usuarioLogueado = "";
+    let registrosMemoria = [];
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBMNFRm_snxnwtU0sy9-q0zyfBcSzKOtS8",
+        databaseURL: "https://bomberoschascomus90-default-rtdb.firebaseio.com",
+        projectId: "bomberoschascomus90",
+        appId: "1:138882346793:web:b069ff3e6d746d64c6d138"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function abrirPanel(id) {
+        if(id === 'panel-despacho') { cerrarSesion(); } 
+        document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'panel-despacho') setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 500);
+    }
+
+    function cerrarPaneles() {
+        cerrarSesion();
+        document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
+    }
+
+    function conectarMQTT() {
+        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_CENT_" + Math.random().toString(16).slice(2, 6));
+        client.connect({ 
+            useSSL: true, 
+            onSuccess: () => {
+                document.getElementById('mqtt-status').innerText = "SISTEMA ONLINE";
+                document.getElementById('mqtt-status').style.color = "#2ecc71";
+            },
+            onFailure: () => { setTimeout(conectarMQTT, 5000); }
+        });
+    }
+
+    function seleccionar(btn, tipo) {
+        document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        tipoSeleccionado = tipo;
+    }
+
+    function ejecutarDespacho() {
+        const direccionVal = document.getElementById('pac-input').value;
+        if (!tipoSeleccionado || !lat || !direccionVal) return alert("Faltan datos de ubicación");
+
+        // Sincronizado con index.html (aviso, direccion, lat, lon)
+        const alerta = {
+            aviso: tipoSeleccionado,
+            direccion: direccionVal,
+            lat: lat,
+            lon: lon
+        };
+
+        if (client && client.isConnected()) {
+            const message = new Paho.MQTT.Message(JSON.stringify(alerta));
+            message.destinationName = "bomberos/unidad/B1"; 
+            client.send(message);
+            alert("DESPACHO ENVIADO CON ÉXITO");
+        } else { conectarMQTT(); alert("Reconectando..."); }
+    }
+
+    function loginBitacora() {
+        const u = document.getElementById('u-bit').value.toLowerCase().trim();
+        const p = document.getElementById('p-bit').value;
+        db.ref('usuarios/' + u).once('value', snap => {
+            if (snap.exists() && snap.val().password === p) {
+                usuarioLogueado = u.toUpperCase();
+                document.getElementById('bit-login').style.display = 'none';
+                document.getElementById('bit-ui').style.display = 'flex';
+                vincularBitacora();
+            } else { alert("Usuario o Clave incorrectos."); }
+        });
+    }
+
+    function vincularBitacora() {
+        db.ref('bitacora').limitToLast(100).on('value', snap => {
+            const box = document.getElementById('historial-bit');
+            box.innerHTML = ""; registrosMemoria = [];
+            snap.forEach(child => {
+                const item = child.val(); registrosMemoria.push(item);
+                box.innerHTML += `<div class="log-entry"><b>[${item.fecha}] ${item.usuario}:</b> ${item.texto}</div>`;
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    function guardarNovedad() {
+        const text = document.getElementById('text-novedad');
+        if(!text.value.trim()) return;
+        db.ref('bitacora').push({
+            usuario: usuarioLogueado,
+            hora: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            fecha: new Date().toLocaleDateString('es-AR'),
+            texto: text.value.trim()
+        });
+        text.value = "";
+    }
+
+    function exportarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // 1. Calcular rango de 7 días
+        const hoy = new Date();
+        const limite = new Date();
+        limite.setDate(hoy.getDate() - 7);
+
+        // 2. Filtrar por Usuario y por Fecha
+        const filtrados = registrosMemoria.filter(r => {
+            const p = r.fecha.split('/');
+            const fReg = new Date(p[2], p[1]-1, p[0]);
+            return r.usuario === usuarioLogueado && fReg >= limite;
+        });
+
+        if(filtrados.length === 0) return alert("No hay registros tuyos en los últimos 7 días.");
+
+        const fS = hoy.toLocaleDateString('es-AR').replace(/\//g, "-");
+        doc.setFontSize(14);
+        doc.text("B.V. CHASCOMÚS - LIBRO DE GUARDIA", 14, 20);
+        doc.setFontSize(10);
+        doc.text(`OPERADOR: ${usuarioLogueado} | PERIODO SEMANAL`, 14, 28);
+
+        doc.autoTable({
+            startY: 35,
+            head: [['Fecha', 'Hora', 'Novedad']],
+            body: filtrados.map(r => [r.fecha, r.hora, r.texto]),
+            theme: 'striped'
+        });
+        doc.save(`SEMANA_${fS}_${usuarioLogueado}.pdf`);
+    }
+
+    function cerrarSesion() {
+        usuarioLogueado = "";
+        document.getElementById('u-bit').value = "";
+        document.getElementById('p-bit').value = "";
+        document.getElementById('bit-login').style.display = 'block';
+        document.getElementById('bit-ui').style.display = 'none';
+    }
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map-full"), {
+            zoom: 14, center: { lat: -35.576, lng: -58.010 },
+            styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
+        });
+        // Límite Chascomús
+        const bounds = { north: -35.350, south: -36.050, east: -57.700, west: -58.350 };
+        const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), {
+            bounds: bounds, componentRestrictions: { country: "ar" }, strictBounds: true
+        });
+        auto.addListener("place_changed", () => {
+            const p = auto.getPlace(); if (!p.geometry) return;
+            lat = p.geometry.location.lat(); lon = p.geometry.location.lng();
+            if (marker) marker.setMap(null);
+            marker = new google.maps.Marker({ position: {lat, lng: lon}, map: map });
+            map.panTo({lat, lng: lon});
+        });
+        conectarMQTT();
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0_KPxSHGYgf-ewC3Cha0yH-ey8-up9ds&libraries=places&callback=initMap" async defer></script>
+</body>
+</html>
