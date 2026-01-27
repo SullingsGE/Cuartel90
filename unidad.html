@@ -5,75 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>UNIDAD B1 - CHASCOMÚS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <style>
         :root { 
             --primary: #e67e22; 
             --danger: #c0392b; 
             --success: #27ae60; 
             --nav: #4285F4;
-            --dark: rgba(10, 10, 10, 0.9); 
+            --dark: rgba(10, 10, 10, 0.95); 
         }
         
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
             font-family: 'Segoe UI', sans-serif; background: #000; 
-            color: white; overflow: hidden; 
+            color: white; overflow-x: hidden;
         }
 
         .bg-unidad {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('camion2.jpg');
-            background-size: cover; background-position: center;
-            z-index: 1;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('camion2.jpg');
+            background-size: cover; background-position: center; z-index: 1;
         }
 
-        .main-container {
-            position: relative; z-index: 10;
-            display: flex; flex-direction: column; height: 100%;
-            justify-content: space-between;
-        }
+        .main-container { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100%; }
 
         .status-bar {
-            background: var(--danger); padding: 20px;
-            text-align: center; font-weight: bold; font-size: 1.4rem;
+            background: var(--danger); padding: 15px;
+            text-align: center; font-weight: bold; font-size: 1.2rem;
             text-transform: uppercase; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         .navigation-zone {
             flex-grow: 1; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; padding: 30px;
+            justify-content: center; align-items: center; padding: 20px;
         }
 
         .btn-google-maps {
             display: none; background: var(--nav); color: white;
-            text-decoration: none; padding: 35px; border-radius: 20px;
-            font-size: 1.6rem; font-weight: 900; text-align: center;
-            border: 4px solid white; width: 100%; max-width: 450px;
+            text-decoration: none; padding: 25px; border-radius: 15px;
+            font-size: 1.4rem; font-weight: 900; text-align: center;
+            border: 3px solid white; width: 90%; max-width: 400px;
             animation: pulse 1.5s infinite;
         }
 
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
 
         #alerta-info-box {
-            display: none; background: rgba(0,0,0,0.85); padding: 25px;
-            border-radius: 15px; margin-bottom: 30px; border-left: 8px solid var(--primary);
-            width: 100%; max-width: 500px;
+            display: none; background: rgba(0,0,0,0.85); padding: 20px;
+            border-radius: 12px; margin-bottom: 20px; border-left: 8px solid var(--primary);
+            width: 90%; max-width: 450px;
         }
 
         .controls {
-            background: var(--dark); padding: 25px;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            background: var(--dark); padding: 20px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
             backdrop-filter: blur(15px);
         }
 
         .btn-op {
-            padding: 25px; border: none; border-radius: 12px; color: white;
-            font-weight: 900; font-size: 1.2rem; text-transform: uppercase;
-            cursor: pointer;
+            padding: 20px; border: none; border-radius: 10px; color: white;
+            font-weight: 900; font-size: 1.1rem; text-transform: uppercase; cursor: pointer;
         }
         .btn-llegada { background: var(--primary); }
         .btn-finalizar { background: var(--success); }
+
+        /* FORMULARIO DE PARTE */
+        #form-parte {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; z-index: 10000; display: none;
+            flex-direction: column; padding: 20px; box-sizing: border-box;
+            overflow-y: auto;
+        }
+        .input-parte {
+            width: 100%; padding: 12px; margin: 10px 0;
+            background: #222; border: 1px solid #444; color: white; border-radius: 5px;
+        }
 
         #alerta-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -82,90 +89,72 @@
             animation: flash-red 0.8s infinite;
         }
         @keyframes flash-red { 0% { background: #000; } 50% { background: #600; } 100% { background: #000; } }
-
-        .toast {
-            position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
-            background: var(--success); padding: 15px 40px; border-radius: 50px;
-            font-weight: bold; z-index: 6000; display: none;
-        }
     </style>
 </head>
 <body>
 
     <div class="bg-unidad"></div>
-    <div id="toast" class="toast">✅ COMUNICADO ENVIADO</div>
 
     <div class="main-container">
         <div class="status-bar" id="status-txt">🚒 UNIDAD B1: DISPONIBLE</div>
         
         <div class="navigation-zone">
             <div id="alerta-info-box">
-                <h2 id="txt-evento" style="color:var(--primary); margin:0; font-size: 1.8rem;"></h2>
-                <p id="txt-dir" style="font-size: 1.5rem; margin: 10px 0; color: #fff;"></p>
+                <h2 id="txt-evento" style="color:var(--primary); margin:0;"></h2>
+                <p id="txt-dir" style="font-size: 1.3rem; margin: 10px 0; color: #fff;"></p>
             </div>
             
-            <a href="#" id="btn-maps" class="btn-google-maps" target="_blank">
-                🗺️ INICIAR NAVEGACIÓN GPS
-            </a>
+            <a href="#" id="btn-maps" class="btn-google-maps" target="_blank">🗺️ INICIAR GPS</a>
         </div>
 
         <div class="controls">
             <button class="btn-op btn-llegada" onclick="enviarEstado('LLEGADA AL LUGAR')">LLEGADA</button>
-            <button class="btn-op btn-finalizar" onclick="enviarEstado('SERVICIO FINALIZADO')">FINALIZAR</button>
+            <button class="btn-op btn-finalizar" onclick="mostrarFormulario()">FINALIZAR</button>
         </div>
     </div>
 
     <div id="alerta-overlay" onclick="aceptarAlerta()">
-        <h1 style="font-size: 3.5rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
-        <div id="msg-alerta" style="text-align: center; margin: 40px; font-size: 2rem; font-weight: bold;"></div>
-        <button class="btn-op" style="background: #fff; color: #000; padding: 25px 60px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
+        <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
+        <div id="msg-alerta" style="text-align: center; margin: 30px; font-size: 1.8rem; font-weight: bold;"></div>
+        <button class="btn-op" style="background: #fff; color: #000; padding: 20px 50px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
+    </div>
+
+    <div id="form-parte">
+        <h2 style="color:var(--primary);">PARTE DE SERVICIO - B1</h2>
+        <label>A Cargo:</label>
+        <input type="text" id="p-cargo" class="input-parte" placeholder="Nombre del oficial">
+        <label>Chofer:</label>
+        <input type="text" id="p-chofer" class="input-parte" placeholder="Nombre del chofer">
+        <label>Personal de Dotación (separado por coma):</label>
+        <textarea id="p-dotacion" class="input-parte" rows="3"></textarea>
+        <label>Detalles del Servicio:</label>
+        <textarea id="p-detalle" class="input-parte" rows="4" placeholder="Breve descripción de lo realizado..."></textarea>
+        
+        <button class="btn-op btn-finalizar" onclick="generarPDF()">GENERAR PDF Y CERRAR</button>
+        <button class="btn-op" style="background:#444; margin-top:10px;" onclick="document.getElementById('form-parte').style.display='none'">CANCELAR</button>
     </div>
 
     <script>
         let client;
+        let datosAlertaActual = { aviso: "", direccion: "" };
 
         function conectarMQTT() {
-            const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 5);
-            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
-            
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNIT_" + Math.random().toString(16).slice(2, 5));
             client.onMessageArrived = (msg) => {
-                try {
-                    const data = JSON.parse(msg.payloadString);
-                    const ahora = Date.now();
+                const data = JSON.parse(msg.payloadString);
+                if (data.aviso && data.direccion) {
+                    datosAlertaActual = data;
+                    document.getElementById('txt-evento').innerText = data.aviso;
+                    document.getElementById('txt-dir').innerText = data.direccion;
+                    document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
                     
-                    // FILTRO DE 30 SEGUNDOS:
-                    // Si el mensaje tiene un timestamp y es mayor a 30 seg, se ignora.
-                    // Si el servidor lo marca como "retained", también se ignora por precaución.
-                    if (msg.retained) return;
+                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(data.direccion + ", Chascomús")}`;
+                    document.getElementById('btn-maps').href = mapsUrl;
                     
-                    if (data.timestamp) {
-                        const diferencia = (ahora - data.timestamp) / 1000;
-                        if (diferencia > 30) {
-                            console.log("Despacho antiguo ignorado (" + diferencia + "s)");
-                            return;
-                        }
-                    }
-
-                    if (data.aviso && data.direccion) {
-                        document.getElementById('txt-evento').innerText = data.aviso;
-                        document.getElementById('txt-dir').innerText = data.direccion;
-                        document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
-                        
-                        // Generar link de navegación
-                        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lon}&travelmode=driving`;
-                        document.getElementById('btn-maps').href = mapsUrl;
-                        
-                        document.getElementById('alerta-overlay').style.display = 'flex';
-                        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-                    }
-                } catch (e) { console.error("Error:", e); }
+                    document.getElementById('alerta-overlay').style.display = 'flex';
+                }
             };
-
-            client.connect({ 
-                useSSL: true, 
-                onSuccess: () => { client.subscribe("bomberos/unidad/B1"); },
-                onFailure: () => setTimeout(conectarMQTT, 5000) 
-            });
+            client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
         }
 
         function aceptarAlerta() {
@@ -176,31 +165,48 @@
             document.getElementById('status-txt').style.background = "#27ae60";
         }
 
-        function enviarEstado(estado) {
-            if (client && client.isConnected()) {
-                const msg = new Paho.MQTT.Message(JSON.stringify({ 
-                    unidad: "B1", estado: estado, time: new Date().toLocaleTimeString() 
-                }));
-                msg.destinationName = "bomberos/central/reportes";
-                client.send(msg);
-                
-                const t = document.getElementById('toast');
-                t.innerText = "✅ " + estado;
-                t.style.display = 'block';
-                setTimeout(() => t.style.display = 'none', 3000);
+        function mostrarFormulario() {
+            document.getElementById('form-parte').style.display = 'flex';
+        }
 
-                if(estado === 'SERVICIO FINALIZADO') {
-                    resetearInterfaz();
-                }
-            }
+        function generarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const cargo = document.getElementById('p-cargo').value;
+            const chofer = document.getElementById('p-chofer').value;
+            const dotacion = document.getElementById('p-dotacion').value;
+            const detalle = document.getElementById('p-detalle').value;
+
+            doc.setFontSize(20);
+            doc.text("PARTE DE SALIDA - BOMBEROS CHASCOMÚS", 20, 20);
+            doc.setFontSize(12);
+            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 30);
+            doc.text(`Siniestro: ${datosAlertaActual.aviso}`, 20, 40);
+            doc.text(`Dirección: ${datosAlertaActual.direccion}`, 20, 50);
+            doc.line(20, 55, 190, 55);
+            
+            doc.text(`A Cargo: ${cargo}`, 20, 65);
+            doc.text(`Chofer: ${chofer}`, 20, 75);
+            doc.text(`Dotación: ${dotacion}`, 20, 85);
+            
+            doc.text("Detalle del Servicio:", 20, 105);
+            doc.text(doc.splitTextToSize(detalle, 160), 20, 115);
+
+            doc.save(`Servicio_B1_${Date.now()}.pdf`);
+            
+            alert("Parte generado con éxito.");
+            document.getElementById('form-parte').style.display = 'none';
+            resetearInterfaz();
         }
 
         function resetearInterfaz() {
             document.getElementById('alerta-info-box').style.display = 'none';
             document.getElementById('btn-maps').style.display = 'none';
-            document.getElementById('alerta-overlay').style.display = 'none';
             document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
             document.getElementById('status-txt').style.background = "#c0392b";
+            // Limpiar campos del formulario
+            document.querySelectorAll('.input-parte').forEach(i => i.value = "");
         }
 
         window.onload = conectarMQTT;
