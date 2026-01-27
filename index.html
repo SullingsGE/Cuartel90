@@ -2,87 +2,62 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Unidad B1 - Terminal Táctica</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <title>UNIDAD B1 - RECEPTOR</title>
     <style>
-        body { margin: 0; background: #121212; color: white; font-family: sans-serif; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; }
-        #header { 
-            position: absolute; top: 0; width: 100%; z-index: 1000; 
-            background: #2c3e50; padding: 15px; text-align: center; 
-            font-weight: bold; border-bottom: 3px solid #e67e22;
-        }
-        #console { 
-            position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.8); 
-            height: 50px; font-size: 11px; padding: 10px; color: #0f0; z-index: 2000;
+        body { margin: 0; background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #header { background: #15191d; padding: 15px; text-align: center; border-bottom: 4px solid #e67e22; }
+        #contenido { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .alerta { background: #1a2229; border-left: 8px solid #e67e22; padding: 25px; border-radius: 10px; width: 90%; text-align: center; display: none; }
+        #tipo { font-size: 32px; font-weight: bold; margin: 15px 0; }
+        #btn-nav { 
+            display: none; width: 100%; padding: 25px; background: #27ae60; color: white; 
+            text-decoration: none; font-size: 22px; font-weight: bold; text-align: center;
         }
     </style>
 </head>
 <body>
-    <div id="header">INICIALIZANDO GPS...</div>
-    <div id="console">> Sistema listo.</div>
-    <div id="map"></div>
+    <div id="header">
+        <div id="status">CONECTANDO...</div>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <div id="contenido">
+        <div id="espera">ESPERANDO DESPACHO...</div>
+        <div class="alerta" id="caja-alerta">
+            <div style="color: #e67e22;">NUEVA EMERGENCIA</div>
+            <div id="tipo"></div>
+            <div id="hora" style="font-family: monospace; color: #888;"></div>
+        </div>
+    </div>
 
+    <a id="btn-nav" href="#">INICIAR VIAJE (GPS)</a>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <script>
-        const log = (m) => { document.getElementById('console').innerText = "> " + m; };
-        var map = L.map('map', {zoomControl: false}).setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        var miPosicion = null;
-        var marcadorUnidad = null;
-        var rutaActual = null;
-
-        // GPS Real-time
-        map.on('locationfound', (e) => {
-            miPosicion = e.latlng;
-            if (!marcadorUnidad) {
-                marcadorUnidad = L.circleMarker(miPosicion, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.8}).addTo(map);
-                map.setView(miPosicion, 16);
-                document.getElementById('header').innerText = "UNIDAD B1 - EN SERVICIO";
-                document.getElementById('header').style.background = "#27ae60";
-            } else {
-                marcadorUnidad.setLatLng(miPosicion);
-            }
-        });
-        map.locate({watch: true, enableHighAccuracy: true});
-
-        // MQTT Config
-        var client = new Paho.MQTT.Client("wss://broker.hivemq.com:8884/mqtt", "CEL_B1_" + Math.random().toString(16).substr(2, 4));
+        var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
         
-        client.onMessageArrived = (msg) => {
-            const data = JSON.parse(msg.payloadString);
-            log("AVISO: " + data.aviso);
-            document.getElementById('header').innerText = "ALERTA: " + data.aviso;
-            document.getElementById('header').style.background = "#c0392b";
-
-            const destino = L.latLng(data.lat, data.lon);
-            if (rutaActual) map.removeControl(rutaActual);
+        client.onMessageArrived = function(msg) {
+            var data = JSON.parse(msg.payloadString);
+            document.getElementById("espera").style.display = "none";
+            document.getElementById("caja-alerta").style.display = "block";
+            document.getElementById("tipo").innerText = data.aviso;
+            document.getElementById("hora").innerText = "Recibido: " + new Date().toLocaleTimeString();
             
-            rutaActual = L.Routing.control({
-                waypoints: [miPosicion || map.getCenter(), destino],
-                lineOptions: { styles: [{ color: '#e67e22', weight: 8 }] },
-                createMarker: function() { return null; },
-                addWaypoints: false
-            }).addTo(map);
-            map.flyTo(destino, 15);
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+            // LINK DE NAVEGACIÓN
+            var link = `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lon}&travelmode=driving`;
+            var btn = document.getElementById("btn-nav");
+            btn.href = link;
+            btn.style.display = "block";
+
+            // Alerta sonora
+            var audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+            audio.play();
         };
 
-        function conectar() {
-            client.connect({
-                useSSL: true,
-                onSuccess: () => { log("CONECTADO A CENTRAL"); client.subscribe("bomberos/unidad/B1"); },
-                onFailure: () => { setTimeout(conectar, 5000); }
-            });
-        }
-        conectar();
+        client.connect({ useSSL: true, onSuccess: function() {
+            document.getElementById("status").innerText = "UNIDAD B1 ONLINE";
+            client.subscribe("bomberos/unidad/B1");
+        }});
     </script>
 </body>
 </html>
-
