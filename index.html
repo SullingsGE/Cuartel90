@@ -2,86 +2,110 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>UNIDAD B1 - SISTEMA INTEGRAL</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body { margin: 0; background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; }
-        .tabs { display: flex; background: #15191d; border-bottom: 3px solid #e67e22; sticky; top: 0; z-index: 100; }
-        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .tab-btn.active { color: #e67e22; border-bottom: 3px solid #e67e22; }
-        .content { display: none; padding: 15px; }
+        :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; --input: #1a2229; --success: #27ae60; }
+        
+        body { margin: 0; background: var(--dark); color: white; font-family: 'Segoe UI', Roboto, sans-serif; }
+        
+        /* Navegación por pestañas */
+        .tabs { display: flex; background: var(--card); border-bottom: 3px solid var(--primary); position: sticky; top: 0; z-index: 100; }
+        .tab-btn { flex: 1; padding: 15px 5px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+
+        .content { display: none; padding: 15px; box-sizing: border-box; }
         .content.active { display: block; }
 
-        /* Estilo Formulario */
-        .section-title { background: #e67e22; color: black; padding: 5px 10px; font-weight: bold; margin-top: 20px; font-size: 14px; text-transform: uppercase; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .form-group { margin-bottom: 10px; text-align: left; }
-        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
-        input, select, textarea { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #1a2229; color: white; box-sizing: border-box; }
+        /* Contenedor de Alerta */
+        .alert-card { background: var(--card); padding: 20px; border-radius: 10px; border-left: 5px solid var(--primary); margin-bottom: 20px; }
+        #txt-aviso { margin: 0; font-size: 1.4rem; text-transform: uppercase; color: var(--primary); }
+        #txt-dir-alerta { color: #aaa; margin: 10px 0; font-size: 1rem; }
+
+        /* BOTONERA UNIFORME */
+        .grid-buttons { display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%; }
         
-        .btn-action { width: 100%; padding: 20px; margin: 10px 0; border-radius: 8px; font-weight: bold; border: none; color: white; cursor: pointer; font-size: 14px; }
+        .btn-action { 
+            width: 100%; 
+            padding: 15px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            border: none; 
+            color: white; 
+            cursor: pointer; 
+            font-size: 1rem; 
+            text-transform: uppercase;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            min-height: 55px;
+        }
+
+        /* Colores específicos */
+        .btn-nav { background: var(--success); }
+        .btn-llegada { background: #2980b9; }
+        .btn-fin { background: #8e44ad; }
+        .btn-cuartel { background: #34495e; }
+        .btn-pdf { background: #e74c3c; margin-top: 20px; }
+
+        /* Estilos del Formulario Planilla */
+        .section-title { background: var(--primary); color: black; padding: 8px 12px; font-weight: bold; margin: 20px 0 10px 0; font-size: 0.9rem; text-transform: uppercase; border-radius: 4px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: var(--input); color: white; box-sizing: border-box; font-size: 1rem; }
+        textarea { resize: vertical; }
+
+        /* Ajuste para pantallas pequeñas */
+        @media (max-width: 480px) {
+            .form-grid { grid-template-columns: 1fr; }
+            #txt-aviso { font-size: 1.2rem; }
+        }
     </style>
 </head>
 <body>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab('nav')">Navegación</button>
-        <button class="tab-btn" onclick="openTab('informe')">Planilla Accidente</button>
+        <button class="tab-btn" onclick="openTab('informe')">Planilla</button>
     </div>
 
     <div id="nav" class="content active">
-        <div id="card-emergencia" style="background: #1a2229; padding: 20px; border-radius: 10px; border-left: 5px solid #e67e22;">
-            <h2 id="txt-aviso">ESPERANDO DESPACHO...</h2>
-            <p id="txt-tiempos"></p>
-            <a id="btn-nav" href="#" class="btn-action" style="background: #27ae60; text-decoration: none; display: none;">INICIAR NAVEGACIÓN GPS</a>
-            <button class="btn-action" style="background: #2980b9;" onclick="marcar('llegada')">LLEGADA AL LUGAR</button>
-            <button class="btn-action" style="background: #8e44ad;" onclick="marcar('fin_trabajo')">FIN DE TRABAJO</button>
-            <button class="btn-action" style="background: #2c3e50;" onclick="marcar('cuartel')">LLEGADA AL CUARTEL</button>
+        <div class="alert-card">
+            <h2 id="txt-aviso">ESPERANDO...</h2>
+            <div id="txt-dir-alerta">No hay servicios activos</div>
+        </div>
+
+        <div class="grid-buttons">
+            <a id="btn-nav" href="#" class="btn-action btn-nav" style="display: none;">MAPA GPS</a>
+            <button class="btn-action btn-llegada" onclick="marcar('llegada')">Llegada al Lugar</button>
+            <button class="btn-action btn-fin" onclick="marcar('fin_trabajo')">Fin de Trabajo</button>
+            <button class="btn-action btn-cuartel" onclick="marcar('cuartel')">Llegada al Cuartel</button>
         </div>
     </div>
 
     <div id="informe" class="content">
-        <div style="text-align: center; color: #e67e22; font-weight: bold;">SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS</div>
-        
-        <div class="section-title">General y Horarios</div>
-        <div class="grid">
+        <div class="section-title">Datos del Siniestro</div>
+        <div class="form-grid">
             <div class="form-group"><label>Fecha</label><input type="date" id="f_fecha"></div>
-            <div class="form-group"><label>Tipo (Aéreo/Trans/Emb/Otro)</label><input type="text" id="f_tipo"></div>
-            <div class="form-group"><label>H. Llamado</label><input type="time" id="f_h_llamado"></div>
-            <div class="form-group"><label>H. Llegada</label><input type="time" id="f_h_llegada"></div>
-            <div class="form-group"><label>H. Fin Trabajo</label><input type="time" id="f_h_fin"></div>
-            <div class="form-group"><label>H. Cuartel</label><input type="time" id="f_h_cuartel"></div>
+            <div class="form-group"><label>Hora Llamado</label><input type="time" id="f_h_llamado"></div>
+        </div>
+        <label>Ubicación / Calle</label>
+        <input type="text" id="f_calle" placeholder="Ej: Calle 123">
+
+        <div class="section-title">Tiempos Registrados</div>
+        <div class="form-grid">
+            <div class="form-group"><label>Llegada</label><input type="time" id="f_h_llegada"></div>
+            <div class="form-group"><label>Fin Trabajo</label><input type="time" id="f_h_fin"></div>
         </div>
 
-        <div class="section-title">Localización</div>
-        <div class="form-group"><label>Calle / Ruta</label><input type="text" id="f_calle"></div>
-        <div class="grid">
-            <div class="form-group"><label>Nº / KM</label><input type="text" id="f_km"></div>
-            <div class="form-group"><label>Tipo Zona</label>
-                <select id="f_zona"><option value="Urbana">Urbana</option><option value="Rural">Rural</option></select>
-            </div>
-        </div>
+        <div class="section-title">Observaciones</div>
+        <textarea id="f_obs" rows="4" placeholder="Detalle del servicio y vehículos intervinientes..."></textarea>
 
-        <div class="section-title">Datos del Solicitante</div>
-        <div class="grid">
-            <div class="form-group"><label>Nombre y Apellido</label><input type="text" id="f_sol_nombre"></div>
-            <div class="form-group"><label>Teléfono / DNI</label><input type="text" id="f_sol_dni"></div>
-        </div>
-
-        <div class="section-title">Víctimas y Seguros</div>
-        <div class="grid">
-            <div class="form-group"><label>Heridos</label><input type="number" id="f_heridos" value="0"></div>
-            <div class="form-group"><label>Fallecidos</label><input type="number" id="f_fallecidos" value="0"></div>
-            <div class="form-group"><label>Compañía Seguro</label><input type="text" id="f_seguro"></div>
-            <div class="form-group"><label>Nº Póliza</label><input type="text" id="f_poliza"></div>
-        </div>
-
-        <div class="section-title">Observaciones y Vehículos</div>
-        <textarea id="f_obs" rows="5" placeholder="Detalle vehículos, dominios y tareas realizadas..."></textarea>
-
-        <button class="btn-action" style="background: #e74c3c;" onclick="generarPDFCompleto()">GENERAR PDF ORIGINAL</button>
+        <button class="btn-action btn-pdf" onclick="generarPDFOriginal()">Generar PDF Oficial</button>
     </div>
 
     <script>
@@ -92,95 +116,74 @@
             event.currentTarget.classList.add('active');
         }
 
-        // --- Lógica MQTT y Navegación ---
+        // MQTT Config
         var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
+        
         client.onMessageArrived = (msg) => {
             var data = JSON.parse(msg.payloadString);
             document.getElementById("txt-aviso").innerText = data.aviso;
-            document.getElementById("f_calle").value = data.aviso;
+            document.getElementById("txt-dir-alerta").innerText = data.direccion;
+            
+            // Llenar planilla automáticamente
+            document.getElementById("f_calle").value = data.direccion;
+            document.getElementById("f_fecha").value = new Date().toISOString().split('T')[0];
             document.getElementById("f_h_llamado").value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            document.getElementById("btn-nav").href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
-            document.getElementById("btn-nav").style.display = "block";
+
+            // Mostrar botón GPS del mismo tamaño que los demás
+            var navBtn = document.getElementById("btn-nav");
+            navBtn.href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
+            navBtn.style.display = "flex";
+            
+            new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
         };
+
         client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
 
         function marcar(evento) {
             let h = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             if(evento === 'llegada') document.getElementById("f_h_llegada").value = h;
             if(evento === 'fin_trabajo') document.getElementById("f_h_fin").value = h;
-            if(evento === 'cuartel') document.getElementById("f_h_cuartel").value = h;
+            
+            // Notificar a la central
             client.send(new Paho.MQTT.Message(JSON.stringify({evento: evento, hora: h})), "bomberos/unidad/B1/estado");
+            alert("Hora de " + evento + " registrada: " + h);
         }
 
-        // --- GENERACIÓN DEL PDF IDENTICO AL ORIGINAL ---
-        function generarPDFCompleto() {
+        function generarPDFOriginal() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const g = (id) => document.getElementById(id).value;
+            const val = (id) => document.getElementById(id).value;
 
-            // Encabezado
+            // Diseño basado en el PDF de Bomberos Chascomús
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
             doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 10, 15);
-            doc.setFontSize(9);
+            doc.setFontSize(10);
             doc.setFont("helvetica", "normal");
-            doc.text("Fundada el 19 de Noviembre de 1960", 10, 20);
-            doc.text("Soler 347 - Tel: 02241 42 4059 - Chascomús", 10, 24);
-            doc.line(10, 26, 200, 26);
+            doc.text("Fundada el 19 de Noviembre de 1960 | Soler 347", 10, 22);
+            doc.line(10, 25, 200, 25);
 
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "bold");
-            doc.text("ACCIDENTE", 85, 35);
+            doc.setFontSize(14);
+            doc.text("INFORME DE SERVICIO", 80, 35);
+
+            doc.setFontSize(11);
+            doc.text("FECHA: " + val('f_fecha'), 10, 50);
+            doc.text("UBICACIÓN: " + val('f_calle'), 10, 60);
             
-            doc.setFontSize(10);
-            doc.text(`Fecha: ${g('f_fecha')}`, 10, 45);
-            doc.text(`Tipo: ${g('f_tipo')}`, 140, 45);
+            doc.rect(10, 65, 190, 30);
+            doc.text("HORARIOS", 15, 72);
+            doc.setFontSize(9);
+            doc.text("Llamado: " + val('f_h_llamado'), 15, 80);
+            doc.text("Llegada: " + val('f_h_llegada'), 70, 80);
+            doc.text("Fin de Trabajo: " + val('f_h_fin'), 130, 80);
 
-            // Cuadrícula de Horarios
-            doc.rect(10, 50, 190, 25);
-            doc.text("HORARIOS", 12, 55);
-            doc.setFontSize(8);
-            doc.text(`LLAMADO: ${g('f_h_llamado')}`, 15, 62);
-            doc.text(`LLEGADA LUGAR: ${g('f_h_llegada')}`, 60, 62);
-            doc.text(`FIN TRABAJO: ${g('f_h_fin')}`, 110, 62);
-            doc.text(`LLEGADA CUARTEL: ${g('f_h_cuartel')}`, 155, 62);
+            doc.setFontSize(11);
+            doc.text("OBSERVACIONES / VEHÍCULOS:", 10, 105);
+            doc.rect(10, 107, 190, 80);
+            var splitObs = doc.splitTextToSize(val('f_obs'), 180);
+            doc.text(splitObs, 15, 115);
 
-            // Localización
-            doc.setFontSize(10);
-            doc.text("LOCALIZACIÓN", 10, 85);
-            doc.rect(10, 87, 190, 20);
-            doc.text(`Calle/Ruta: ${g('f_calle')}`, 15, 93);
-            doc.text(`KM/Nº: ${g('f_km')}`, 120, 93);
-            doc.text(`Tipo Zona: ${g('f_zona')}`, 15, 101);
-
-            // Solicitante y Seguro
-            doc.text("SOLICITANTE / SEGURO", 10, 115);
-            doc.rect(10, 117, 190, 20);
-            doc.text(`Nombre: ${g('f_sol_nombre')}`, 15, 123);
-            doc.text(`Doc/Tel: ${g('f_sol_dni')}`, 110, 123);
-            doc.text(`Seguro: ${g('f_seguro')} - Póliza: ${g('f_poliza')}`, 15, 131);
-
-            // Víctimas
-            doc.text("PERSONAS DAMNIFICADAS", 10, 145);
-            doc.rect(10, 147, 190, 15);
-            doc.text(`Heridos: ${g('f_heridos')}`, 15, 156);
-            doc.text(`Fallecidos: ${g('f_fallecidos')}`, 60, 156);
-
-            // Observaciones
-            doc.text("OBSERVACIONES / VEHÍCULOS AFECTADOS", 10, 170);
-            doc.rect(10, 172, 190, 80);
-            var splitObs = doc.splitTextToSize(g('f_obs'), 180);
-            doc.text(splitObs, 15, 178);
-
-            // Firmas
-            doc.line(30, 280, 80, 280);
-            doc.text("Jefe de Dotación", 42, 285);
-            doc.line(130, 280, 180, 280);
-            doc.text("Operador Central", 142, 285);
-
-            doc.save(`Planilla_Accidente_${g('f_fecha')}.pdf`);
+            doc.save("Informe_" + val('f_fecha') + ".pdf");
         }
     </script>
 </body>
 </html>
-
