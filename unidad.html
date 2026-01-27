@@ -6,153 +6,201 @@
     <title>UNIDAD B1 - CHASCOMÚS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <style>
-        :root { --primary: #e67e22; --danger: #c0392b; --success: #27ae60; --dark: rgba(10, 10, 10, 0.85); }
+        :root { 
+            --primary: #e67e22; 
+            --danger: #c0392b; 
+            --success: #27ae60; 
+            --nav: #3498db;
+            --dark: rgba(15, 15, 15, 0.9); 
+        }
         
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow: hidden; }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            font-family: 'Segoe UI', sans-serif; background: #000; 
+            color: white; overflow: hidden; 
+        }
 
-        /* FONDO CON FOTO REAL */
+        /* FONDO CON TU FOTO REAL */
         .bg-unidad {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('camion2.jpg');
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('camion2.jpg');
             background-size: cover; background-position: center;
             z-index: 1;
         }
 
-        /* CAPA OPERATIVA */
         .main-container {
             position: relative; z-index: 10;
             display: flex; flex-direction: column; height: 100%;
+            justify-content: space-between;
         }
 
-        /* Barra Superior */
         .status-bar {
-            background: var(--danger); color: white; padding: 10px;
-            text-align: center; font-weight: bold; font-size: 1.2rem;
-            letter-spacing: 1px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background: var(--danger); padding: 20px;
+            text-align: center; font-weight: bold; font-size: 1.3rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
 
-        /* Área de Mapa */
-        #map-unidad { flex-grow: 1; width: 100%; background: #1a1a1a; }
-
-        /* Panel de Alerta (Se activa cuando llega despacho) */
-        #alerta-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 5000;
-            display: none; flex-direction: column; justify-content: center; align-items: center;
-            animation: flash red 1s infinite;
+        /* CONTENEDOR CENTRAL DE INFO Y NAVEGACIÓN */
+        .info-center {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
         }
-        @keyframes flash { 0% { background: rgba(0,0,0,0.9); } 50% { background: rgba(192, 57, 43, 0.5); } 100% { background: rgba(0,0,0,0.9); } }
 
-        /* Botonera Inferior */
+        .btn-nav-google {
+            background: var(--nav);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 1.5rem;
+            font-weight: 900;
+            display: none; /* Se muestra solo cuando hay alerta */
+            box-shadow: 0 0 30px rgba(52, 152, 219, 0.5);
+            border: 3px solid white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        #alerta-texto {
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: none;
+            border: 1px solid var(--primary);
+        }
+
         .controls {
-            background: var(--dark); padding: 15px;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            background: var(--dark); padding: 25px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            backdrop-filter: blur(15px);
         }
 
         .btn-op {
-            padding: 20px; border: none; border-radius: 8px; color: white;
-            font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer;
+            padding: 25px; border: none; border-radius: 12px; color: white;
+            font-weight: 900; font-size: 1.1rem; text-transform: uppercase;
         }
         .btn-llegada { background: var(--primary); }
         .btn-finalizar { background: var(--success); }
 
-        /* Notificación Toast */
+        /* Pantalla Emergencia Full */
+        #alerta-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 5000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            animation: flash-emergency 0.8s infinite;
+        }
+        @keyframes flash-emergency { 
+            0% { background: rgba(0,0,0,0.9); } 
+            50% { background: rgba(192, 57, 43, 0.7); } 
+            100% { background: rgba(0,0,0,0.9); } 
+        }
+
         .toast {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            background: var(--success); padding: 15px 30px; border-radius: 50px;
-            font-weight: bold; z-index: 6000; display: none; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+            background: var(--success); padding: 15px 40px; border-radius: 50px;
+            font-weight: bold; z-index: 6000; display: none; 
         }
     </style>
 </head>
 <body>
 
     <div class="bg-unidad"></div>
-    <div id="toast" class="toast">✅ MENSAJE ENVIADO A CENTRAL</div>
+    <div id="toast" class="toast">✅ REGISTRADO</div>
 
     <div class="main-container">
-        <div class="status-bar" id="status-txt">UNIDAD B1: ESPERANDO DESPACHO</div>
+        <div class="status-bar" id="status-txt">🚒 UNIDAD B1: EN ESPERA</div>
         
-        <div id="map-unidad"></div>
+        <div class="info-center">
+            <div id="alerta-texto">
+                <h2 id="tipo-servicio" style="color:var(--primary); margin:0;"></h2>
+                <p id="dir-servicio" style="font-size:1.4rem; margin:10px 0;"></p>
+            </div>
+            
+            <a href="#" id="btn-gps" class="btn-nav-google" target="_blank">
+                📍 INICIAR NAVEGACIÓN GPS
+            </a>
+        </div>
 
         <div class="controls">
-            <button class="btn-op btn-llegada" onclick="enviarEstado('LLEGADA AL LUGAR')">LLEGADA AL LUGAR</button>
-            <button class="btn-op btn-finalizar" onclick="enviarEstado('SERVICIO FINALIZADO')">FINALIZAR Y RETORNAR</button>
+            <button class="btn-op btn-llegada" onclick="enviarEstado('LLEGADA AL LUGAR')">LLEGADA</button>
+            <button class="btn-op btn-finalizar" onclick="enviarEstado('SERVICIO FINALIZADO')">FINALIZAR</button>
         </div>
     </div>
 
     <div id="alerta-overlay" onclick="aceptarAlerta()">
         <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ENTRANTE ⚠️</h1>
-        <div id="alerta-info" style="text-align: center; margin: 30px; font-size: 1.5rem;"></div>
-        <button class="btn-op" style="background: white; color: black; padding: 20px 50px;">RECIBIDO / IR AL MAPA</button>
+        <div id="overlay-info" style="text-align: center; margin: 40px; font-size: 1.8rem; font-weight: bold;"></div>
+        <button class="btn-op" style="background: white; color: black; padding: 25px 60px; font-size: 1.3rem;">RECIBIR DESPACHO</button>
     </div>
 
     <script>
-        let map, marker, client;
-
-        function mostrarToast(txt) {
-            const t = document.getElementById('toast');
-            t.innerText = txt; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
-        }
+        let client;
+        let currentLat, currentLon;
 
         function conectarMQTT() {
-            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNID_" + Math.random().toString(16).slice(2, 5));
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNIT_" + Math.random().toString(16).slice(2, 5));
             client.onMessageArrived = (msg) => {
                 const data = JSON.parse(msg.payloadString);
-                const info = `🚑 EVENTO: ${data.aviso}<br>📍 DIR: ${data.direccion}`;
-                document.getElementById('alerta-info').innerHTML = info;
+                
+                // Actualizar interfaz
+                document.getElementById('tipo-servicio').innerText = data.aviso;
+                document.getElementById('dir-servicio').innerText = data.direccion;
+                document.getElementById('overlay-info').innerHTML = `${data.aviso}<br>${data.direccion}`;
+                
+                // Configurar Link de Google Maps
+                const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lon}&travelmode=driving`;
+                document.getElementById('btn-gps').href = mapsUrl;
+                
+                // Mostrar alerta
                 document.getElementById('alerta-overlay').style.display = 'flex';
-                actualizarMapa(data.lat, data.lon);
+                if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
             };
 
             client.connect({ useSSL: true, onSuccess: () => {
                 client.subscribe("bomberos/unidad/B1");
-                console.log("Conectado a Central");
-            }});
+                console.log("Sistema de escucha activo");
+            }, onFailure: () => setTimeout(conectarMQTT, 5000) });
         }
 
         function aceptarAlerta() {
             document.getElementById('alerta-overlay').style.display = 'none';
-            document.getElementById('status-txt').innerText = "EN SERVICIO ACTIVAMENTE";
+            document.getElementById('alerta-texto').style.display = 'block';
+            document.getElementById('btn-gps').style.display = 'block';
+            document.getElementById('status-txt').innerText = "🚨 EN SERVICIO";
             document.getElementById('status-txt').style.background = "#27ae60";
         }
 
         function enviarEstado(estado) {
             if (client && client.isConnected()) {
                 const msg = new Paho.MQTT.Message(JSON.stringify({ 
-                    unidad: "B1", 
-                    estado: estado, 
-                    time: new Date().toLocaleTimeString() 
+                    unidad: "B1", estado: estado, time: new Date().toLocaleTimeString() 
                 }));
                 msg.destinationName = "bomberos/central/reportes";
                 client.send(msg);
-                mostrarToast("✅ " + estado + " REGISTRADO");
+                
+                const t = document.getElementById('toast');
+                t.style.display = 'block';
+                setTimeout(() => t.style.display = 'none', 3000);
+
                 if(estado === 'SERVICIO FINALIZADO') {
-                    document.getElementById('status-txt').innerText = "UNIDAD B1: DISPONIBLE";
-                    document.getElementById('status-txt').style.background = "#c0392b";
+                    location.reload(); // Reinicia el panel para el próximo servicio
                 }
             }
         }
 
-        function initMap() {
-            map = new google.maps.Map(document.getElementById("map-unidad"), {
-                zoom: 15, center: { lat: -35.576, lng: -58.010 },
-                disableDefaultUI: true,
-                styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
-            });
-            conectarMQTT();
-        }
-
-        function actualizarMapa(lat, lon) {
-            const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
-            if (marker) marker.setMap(null);
-            marker = new google.maps.Marker({ position: pos, map: map, animation: google.maps.Animation.BOUNCE });
-            map.panTo(pos);
-            map.setZoom(17);
-        }
+        window.onload = conectarMQTT;
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0_KPxSHGYgf-ewC3Cha0yH-ey8-up9ds&callback=initMap" async defer></script>
 </body>
 </html>
