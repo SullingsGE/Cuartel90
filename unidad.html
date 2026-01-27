@@ -15,7 +15,6 @@
         .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 1.2rem; transition: 0.3s; }
         .navigation-zone { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         #alerta-info-box { display: none; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 12px; border-left: 8px solid var(--primary); width: 90%; max-width: 450px; }
-        
         .controls { background: var(--dark); padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn-op { padding: 18px; border: none; border-radius: 10px; color: white; font-weight: 900; text-transform: uppercase; cursor: pointer; font-size: 0.8rem; }
         .btn-full { grid-column: span 2; background: #444; }
@@ -41,7 +40,6 @@
                 <a href="#" id="btn-maps" target="_blank" style="display:block; background:var(--primary); color:white; text-align:center; padding:15px; text-decoration:none; border-radius:8px; font-weight:bold;">ABRIR GPS</a>
             </div>
         </div>
-        
         <div class="controls">
             <button class="btn-op" style="background:var(--info)" onclick="alert('LLEGADA NOTIFICADA')">LLEGADA</button>
             <button class="btn-op" style="background:var(--success)" onclick="abrirFormulario()">GENERAR PARTE</button>
@@ -49,27 +47,22 @@
         </div>
     </div>
 
-    <div id="alerta-overlay" onclick="aceptarAlerta()">
-        <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
-        <div id="msg-alerta" style="margin: 30px; font-size: 2rem; font-weight: bold;"></div>
-        <button class="btn-op" style="background: #fff; color: #000; padding: 20px 50px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
-    </div>
-
     <div id="form-parte">
-        <h3 style="text-align:center; margin:0;">PARTE DE SALIDA - B.V. CHASCOMÚS</h3>
+        <h3 style="text-align:center; margin:0; color:var(--primary)">PARTE OFICIAL DE SERVICIO</h3>
         <div class="seccion-titulo">Horarios</div>
         <div class="grid-form">
             <div><label>Llamado</label><input type="time" id="h-llamado" class="input-f"></div>
-            <div><label>Llegada Lugar</label><input type="time" id="h-llegada" class="input-f"></div>
+            <div><label>Llegada</label><input type="time" id="h-llegada" class="input-f"></div>
             <div><label>Fin Trabajo</label><input type="time" id="h-fin" class="input-f"></div>
-            <div><label>Regreso Cuartel</label><input type="time" id="h-cuartel" class="input-f"></div>
+            <div><label>Regreso</label><input type="time" id="h-cuartel" class="input-f"></div>
         </div>
-        <div class="seccion-titulo">Localización</div>
-        <input type="text" id="f-calle" class="input-f" placeholder="Calle / Ruta / KM">
-        <input type="text" id="r-cargo" class="input-f" placeholder="Jefe de Dotación">
-        <textarea id="f-obs" class="input-f" style="height:100px; margin-top:10px;" placeholder="Observaciones..."></textarea>
+        <div class="seccion-titulo">Ubicación y Personal</div>
+        <input type="text" id="f-calle" class="input-f" placeholder="Dirección Exacta">
+        <input type="text" id="f-entre" class="input-f" placeholder="Entre calles / Referencias">
+        <input type="text" id="r-cargo" class="input-f" placeholder="Jefe de Dotación / Responsable">
+        <textarea id="f-obs" class="input-f" style="height:80px; margin-top:10px;" placeholder="Informe breve del servicio..."></textarea>
         
-        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">DESCARGAR PDF</button>
+        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">DESCARGAR PARTE OFICIAL</button>
         <button class="btn-op" style="background:#444; width:100%; margin-top:10px;" onclick="cerrarFormulario()">VOLVER</button>
     </div>
 
@@ -78,35 +71,17 @@
         let datosAlertaActual = { aviso: "", direccion: "" };
 
         function conectarMQTT() {
-            // Cliente con ID único para sesión limpia
             const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 8);
             client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
-            
             client.onMessageArrived = (msg) => {
-                try {
-                    const data = JSON.parse(msg.payloadString);
-                    const ahora = Date.now();
-                    
-                    // FILTRO DE 5 SEGUNDOS: Mata a "San Martín" y cualquier mensaje viejo
-                    if (data.timestamp) {
-                        const dif = ahora - data.timestamp;
-                        if (dif > 5000 || dif < -1000) { 
-                            console.log("Mensaje antiguo descartado.");
-                            return; 
-                        }
-                    } else { return; }
-
+                const data = JSON.parse(msg.payloadString);
+                if (Date.now() - data.timestamp < 5000) {
                     datosAlertaActual = data;
                     document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
                     document.getElementById('alerta-overlay').style.display = 'flex';
-                } catch(e) { console.error(e); }
+                }
             };
-
-            client.connect({ 
-                useSSL: true, 
-                cleanSession: true, 
-                onSuccess: () => client.subscribe("bomberos/unidad/B1") 
-            });
+            client.connect({ useSSL: true, cleanSession: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
         }
 
         function aceptarAlerta() {
@@ -114,41 +89,104 @@
             document.getElementById('alerta-info-box').style.display = 'block';
             document.getElementById('txt-evento').innerText = datosAlertaActual.aviso;
             document.getElementById('txt-dir').innerText = datosAlertaActual.direccion;
-            document.getElementById('btn-maps').href = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(datosAlertaActual.direccion + ", Chascomus");
+            document.getElementById('btn-maps').href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(datosAlertaActual.direccion + ", Chascomus");
             document.getElementById('status-txt').innerText = "🚨 EN SERVICIO";
             document.getElementById('status-txt').style.background = "#27ae60";
         }
 
         function abrirFormulario() {
-            if(!datosAlertaActual.direccion) return alert("No hay alerta activa");
             document.getElementById('f-calle').value = datosAlertaActual.direccion;
             document.getElementById('form-parte').style.display = 'flex';
         }
 
-        function cerrarFormulario() { 
-            document.getElementById('form-parte').style.display = 'none'; 
-        }
+        function cerrarFormulario() { document.getElementById('form-parte').style.display = 'none'; }
 
         function generarPDFFinal() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text("PARTE DE SERVICIO - B.V. CHASCOMÚS", 20, 20);
-            doc.text("Siniestro: " + datosAlertaActual.aviso, 20, 35);
-            doc.text("Ubicación: " + document.getElementById('f-calle').value, 20, 45);
-            doc.save(`Parte_B1.pdf`);
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // --- ENCABEZADO ESTILO OFICIAL ---
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 105, 15, { align: "center" });
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.text("Fundada el 19 de Noviembre de 1960", 105, 19, { align: "center" });
+            doc.text("Soler 347 - Tel: 02241 42-4059 - Chascomús, Bs. As.", 105, 23, { align: "center" });
+            
+            doc.setLineWidth(0.5);
+            doc.line(10, 26, 200, 26); // Línea divisoria
+
+            // --- TÍTULO DEL TIPO DE SINIESTRO ---
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text(datosAlertaActual.aviso || "SERVICIO GENERAL", 105, 35, { align: "center" });
+            
+            // --- SECCIÓN: HORARIOS (TABLA) ---
+            doc.setFillColor(230, 230, 230);
+            doc.rect(10, 42, 190, 7, 'F');
+            doc.setFontSize(10);
+            doc.text("CRONOLOGÍA DE HORARIOS", 15, 47);
+            
+            doc.setLineWidth(0.1);
+            doc.rect(10, 42, 190, 25); // Cuadro horarios
+            doc.text(`Llamado: ${document.getElementById('h-llamado').value}`, 15, 56);
+            doc.text(`Llegada lugar: ${document.getElementById('h-llegada').value}`, 60, 56);
+            doc.text(`Fin trabajo: ${document.getElementById('h-fin').value}`, 110, 56);
+            doc.text(`Regreso: ${document.getElementById('h-cuartel').value}`, 160, 56);
+
+            // --- SECCIÓN: LOCALIZACIÓN ---
+            doc.setFillColor(230, 230, 230);
+            doc.rect(10, 72, 190, 7, 'F');
+            doc.text("UBICACIÓN DEL SINIESTRO", 15, 77);
+            doc.rect(10, 72, 190, 20);
+            doc.setFont("helvetica", "normal");
+            doc.text(`CALLE/RUTA: ${document.getElementById('f-calle').value}`, 15, 84);
+            doc.text(`ENTRE CALLES: ${document.getElementById('f-entre').value}`, 15, 89);
+
+            // --- SECCIÓN: PERSONAL Y OBSERVACIONES ---
+            doc.setFillColor(230, 230, 230);
+            doc.rect(10, 97, 190, 7, 'F');
+            doc.setFont("helvetica", "bold");
+            doc.text("INFORME Y RESPONSABLE", 15, 102);
+            doc.rect(10, 97, 190, 50);
+            
+            doc.setFont("helvetica", "normal");
+            doc.text("JEFE DE DOTACIÓN:", 15, 110);
+            doc.setFont("helvetica", "bold");
+            doc.text(document.getElementById('r-cargo').value.toUpperCase(), 55, 110);
+            
+            doc.setFont("helvetica", "normal");
+            doc.text("DETALLES DEL SERVICIO:", 15, 118);
+            const obs = document.getElementById('f-obs').value;
+            const splitObs = doc.splitTextToSize(obs, 180);
+            doc.text(splitObs, 15, 124);
+
+            // --- PIE DE PÁGINA ---
+            doc.setFontSize(8);
+            doc.text("Documento generado digitalmente por Sistema Central B1", 10, 285);
+            doc.text("Fecha de impresión: " + new Date().toLocaleString(), 150, 285);
+
+            doc.save(`Parte_${datosAlertaActual.aviso}_${Date.now()}.pdf`);
             cerrarFormulario();
+            resetearInterfaz();
         }
 
         function resetearInterfaz() {
-            // Limpia la alerta actual y vuelve al estado Disponible
             document.getElementById('alerta-info-box').style.display = 'none';
             document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
             document.getElementById('status-txt').style.background = "#c0392b";
             datosAlertaActual = { aviso: "", direccion: "" };
-            console.log("Sistema en espera de nueva alerta.");
         }
 
         window.onload = conectarMQTT;
     </script>
+
+    <div id="alerta-overlay" onclick="aceptarAlerta()">
+        <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
+        <div id="msg-alerta" style="margin: 30px; font-size: 2rem; font-weight: bold;"></div>
+        <button class="btn-op" style="background: #fff; color: #000; padding: 20px 50px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
+    </div>
 </body>
 </html>
