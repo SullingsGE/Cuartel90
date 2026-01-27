@@ -6,25 +6,28 @@
     <title>UNIDAD B1 - CHASCOMÚS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <style>
-        :root { --primary: #e67e22; --danger: #c0392b; --success: #27ae60; --dark: #0f0f0f; }
+        :root { --primary: #e67e22; --danger: #c0392b; --success: #27ae60; --dark: #0f0f0f; --info: #2980b9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow: hidden; }
         .bg-unidad { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('camion2.jpg') center/cover; z-index: 1; }
         .main-container { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100%; }
-        .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 1.2rem; }
+        .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 1.2rem; transition: 0.3s; }
         .navigation-zone { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         #alerta-info-box { display: none; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 12px; border-left: 8px solid var(--primary); width: 90%; max-width: 450px; }
-        .controls { background: var(--dark); padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-op { padding: 20px; border: none; border-radius: 10px; color: white; font-weight: 900; text-transform: uppercase; cursor: pointer; }
+        
+        .controls { background: var(--dark); padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-op { padding: 18px; border: none; border-radius: 10px; color: white; font-weight: 900; text-transform: uppercase; cursor: pointer; font-size: 0.8rem; }
+        .btn-full { grid-column: span 2; background: #444; }
+
         #alerta-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; animation: flash 1s infinite; }
         @keyframes flash { 0% { background: #000; } 50% { background: #500; } 100% { background: #000; } }
+        
         #form-parte { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; box-sizing: border-box; }
         .seccion-titulo { background: var(--primary); color: white; padding: 8px; margin: 15px 0 10px 0; font-weight: bold; text-transform: uppercase; font-size: 13px; }
-        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .input-f { width: 100%; padding: 12px; margin-bottom: 5px; background: #2b2b2b; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
         label { font-size: 11px; color: #aaa; text-transform: uppercase; display: block; margin-top: 5px; }
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     </style>
 </head>
 <body>
@@ -38,9 +41,11 @@
                 <a href="#" id="btn-maps" target="_blank" style="display:block; background:var(--primary); color:white; text-align:center; padding:15px; text-decoration:none; border-radius:8px; font-weight:bold;">ABRIR GPS</a>
             </div>
         </div>
+        
         <div class="controls">
-            <button class="btn-op" style="background:var(--primary)" onclick="alert('Estado enviado: LLEGADA')">LLEGADA</button>
-            <button class="btn-op" style="background:var(--success)" onclick="abrirFormulario()">FINALIZAR</button>
+            <button class="btn-op" style="background:var(--info)" onclick="alert('LLEGADA NOTIFICADA')">LLEGADA</button>
+            <button class="btn-op" style="background:var(--success)" onclick="abrirFormulario()">GENERAR PARTE</button>
+            <button class="btn-op btn-full" onclick="resetearInterfaz()">FINALIZAR SERVICIO (ESPERA)</button>
         </div>
     </div>
 
@@ -61,16 +66,10 @@
         </div>
         <div class="seccion-titulo">Localización</div>
         <input type="text" id="f-calle" class="input-f" placeholder="Calle / Ruta / KM">
-        <input type="text" id="f-entre" class="input-f" placeholder="Entre calles / Localidad">
-        <div class="seccion-titulo">Damnificados</div>
-        <div class="grid-form">
-            <div><label>Civiles Heridos</label><input type="number" id="d-heridos" class="input-f" value="0"></div>
-            <div><label>Civiles Fallecidos</label><input type="number" id="d-fallecidos" class="input-f" value="0"></div>
-        </div>
-        <div class="seccion-titulo">Responsables</div>
         <input type="text" id="r-cargo" class="input-f" placeholder="Jefe de Dotación">
         <textarea id="f-obs" class="input-f" style="height:100px; margin-top:10px;" placeholder="Observaciones..."></textarea>
-        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">GENERAR PDF</button>
+        
+        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">DESCARGAR PDF</button>
         <button class="btn-op" style="background:#444; width:100%; margin-top:10px;" onclick="cerrarFormulario()">VOLVER</button>
     </div>
 
@@ -79,29 +78,35 @@
         let datosAlertaActual = { aviso: "", direccion: "" };
 
         function conectarMQTT() {
-            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_UNIT_" + Math.random().toString(16).slice(2, 5));
+            // Cliente con ID único para sesión limpia
+            const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 8);
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
+            
             client.onMessageArrived = (msg) => {
                 try {
                     const data = JSON.parse(msg.payloadString);
                     const ahora = Date.now();
                     
-                    // FILTRO DE SEGURIDAD: Si el mensaje no tiene timestamp o es mayor a 60 seg, se descarta
+                    // FILTRO DE 5 SEGUNDOS: Mata a "San Martín" y cualquier mensaje viejo
                     if (data.timestamp) {
-                        const diferencia = (ahora - data.timestamp) / 1000;
-                        if (diferencia > 60) {
-                            console.log("Alerta vieja ignorada: " + data.direccion);
+                        const dif = ahora - data.timestamp;
+                        if (dif > 5000 || dif < -1000) { 
+                            console.log("Mensaje antiguo descartado.");
                             return; 
                         }
-                    }
+                    } else { return; }
 
-                    if (data.aviso && data.direccion) {
-                        datosAlertaActual = data;
-                        document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
-                        document.getElementById('alerta-overlay').style.display = 'flex';
-                    }
-                } catch(e) { console.error("Error en mensaje:", e); }
+                    datosAlertaActual = data;
+                    document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
+                    document.getElementById('alerta-overlay').style.display = 'flex';
+                } catch(e) { console.error(e); }
             };
-            client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
+
+            client.connect({ 
+                useSSL: true, 
+                cleanSession: true, 
+                onSuccess: () => client.subscribe("bomberos/unidad/B1") 
+            });
         }
 
         function aceptarAlerta() {
@@ -109,35 +114,38 @@
             document.getElementById('alerta-info-box').style.display = 'block';
             document.getElementById('txt-evento').innerText = datosAlertaActual.aviso;
             document.getElementById('txt-dir').innerText = datosAlertaActual.direccion;
-            // Link corregido
-            document.getElementById('btn-maps').href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(datosAlertaActual.direccion + ", Chascomus");
+            document.getElementById('btn-maps').href = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(datosAlertaActual.direccion + ", Chascomus");
             document.getElementById('status-txt').innerText = "🚨 EN SERVICIO";
             document.getElementById('status-txt').style.background = "#27ae60";
         }
 
         function abrirFormulario() {
+            if(!datosAlertaActual.direccion) return alert("No hay alerta activa");
             document.getElementById('f-calle').value = datosAlertaActual.direccion;
             document.getElementById('form-parte').style.display = 'flex';
         }
 
-        function cerrarFormulario() { document.getElementById('form-parte').style.display = 'none'; }
+        function cerrarFormulario() { 
+            document.getElementById('form-parte').style.display = 'none'; 
+        }
 
         function generarPDFFinal() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text("ACTA DE SERVICIO - CHASCOMÚS", 20, 20);
+            doc.text("PARTE DE SERVICIO - B.V. CHASCOMÚS", 20, 20);
             doc.text("Siniestro: " + datosAlertaActual.aviso, 20, 35);
             doc.text("Ubicación: " + document.getElementById('f-calle').value, 20, 45);
-            doc.text("A Cargo: " + document.getElementById('r-cargo').value, 20, 55);
-            doc.save(`Acta_B1.pdf`);
+            doc.save(`Parte_B1.pdf`);
             cerrarFormulario();
-            resetearInterfaz();
         }
 
         function resetearInterfaz() {
+            // Limpia la alerta actual y vuelve al estado Disponible
             document.getElementById('alerta-info-box').style.display = 'none';
             document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
             document.getElementById('status-txt').style.background = "#c0392b";
+            datosAlertaActual = { aviso: "", direccion: "" };
+            console.log("Sistema en espera de nueva alerta.");
         }
 
         window.onload = conectarMQTT;
