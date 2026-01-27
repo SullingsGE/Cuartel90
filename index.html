@@ -86,6 +86,15 @@
 
         map.on('locationfound', onLocationFound);
         map.locate({ setView: true, watch: true, enableHighAccuracy: true });
+    function enviarAEmergencia() {
+    // Simulamos que la central nos manda a unas coordenadas específicas
+    // Cambia estas coordenadas por una dirección real cerca de tu casa para la prueba
+    var latIncendio = tu_lat_aqui + 0.005; 
+    var lonIncendio = tu_lon_aqui + 0.005;
+    
+    navegarA(latIncendio, lonIncendio, "INCENDIO ESTRUCTURAL - CALLE 5");
+}
     </script>
 </body>
+
 </html>
