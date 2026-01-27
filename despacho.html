@@ -5,7 +5,6 @@
     <title>SISTEMA CENTRAL B1 - CHASCOMÚS</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     
     <style>
         :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); }
@@ -13,40 +12,39 @@
         
         .bg-cuartel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: url('cuartel.jpg') no-repeat center center; background-size: cover; filter: blur(8px) brightness(0.4); z-index: 1; }
         
-        /* MAPA: Corregido para que ocupe el área izquierda cuando el panel está activo */
-        #map-full { position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; z-index: 5; background: #111; }
+        /* Paneles */
+        .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.4s ease-out; z-index: 1000; display: flex; visibility: hidden; }
+        .full-panel.active { left: 0; visibility: visible; }
         
-        .btn-back { position: fixed; top: 10px; left: 10px; z-index: 3000; background: rgba(51,51,51,0.8); color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 11px; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
-
+        #map-full { position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; background: #111; }
+        
+        /* Pestañas laterales */
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
         .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
         
-        .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.4s ease-out; z-index: 1000; display: flex; }
-        .full-panel.active { left: 0; }
-        
-        #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; position: absolute; right: 0; height: 100%; z-index: 10; }
+        /* Despacho */
+        #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; position: absolute; right: 0; height: 100%; }
         .panel-header { width: 100%; height: 100px; background: url('escudo.png') no-repeat center; background-size: contain; margin-bottom: 10px; }
         
-        #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.95); padding: 40px 40px 40px 80px; box-sizing: border-box; display: flex; flex-direction: column; }
+        /* Bitácora */
+        #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.98); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
         .input-std { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.6); border: 1px solid #555; color: white; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        .btn-tipo { width: 100%; padding: 10px; margin-bottom: 6px; border: 2px solid transparent; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; opacity: 0.6; font-size: 11px; transition: 0.2s; }
-        .btn-tipo.selected { opacity: 1; border-color: white; transform: scale(1.02); }
-        .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; }
+        .btn-tipo { width: 100%; padding: 10px; margin-bottom: 6px; border: 2px solid transparent; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; opacity: 0.6; font-size: 11px; }
+        .btn-tipo.selected { opacity: 1; border: 2px solid #fff; }
+        .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; text-transform: uppercase; }
 
-        .btn-rescate { background: #2980b9; }
-        .btn-accidente { background: #f1c40f; color: #000; }
-        .btn-incendio { background: #c0392b; }
-
-        #historial-bit { flex-grow: 1; background: rgba(0,0,0,0.5); overflow-y: auto; margin: 20px 0; padding: 20px; border-radius: 8px; border: 1px solid #444; }
-        .log-entry { border-left: 4px solid var(--primary); background: rgba(26, 30, 35, 0.8); padding: 12px; margin-bottom: 12px; }
+        #bit-login { max-width: 350px; width: 100%; display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 12px; border: 1px solid var(--primary); }
+        #bit-ui { display:none; height: 90%; width: 100%; max-width: 1000px; flex-direction: column; }
+        #historial-bit { flex-grow: 1; background: rgba(0,0,0,0.5); overflow-y: auto; margin: 20px 0; padding: 20px; border-radius: 8px; border: 1px solid #444; font-size: 14px; }
+        .log-entry { border-left: 4px solid var(--primary); background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 4px 4px 0; }
+        
         .close-btn { position: absolute; top: 20px; right: 30px; font-size: 45px; color: white; cursor: pointer; background: none; border: none; z-index: 1100; }
     </style>
 </head>
 <body>
 
 <div class="bg-cuartel"></div>
-<a href="index.html" class="btn-back">« MENU PRINCIPAL</a>
 
 <div class="handle-container">
     <div class="drawer-handle" onclick="abrirPanel('panel-despacho')">DESPACHO</div>
@@ -58,43 +56,44 @@
     <div id="map-full"></div>
     <div id="despacho-control">
         <div class="panel-header"></div> 
-        <h2 style="color:var(--primary); margin: 0; text-align: center;">CENTRAL B1</h2>
-        <input id="pac-input" class="input-std" type="text" placeholder="Calle o Ruta en Chascomús...">
+        <input id="pac-input" class="input-std" type="text" placeholder="Calle en Chascomús...">
         <div style="margin: 15px 0; flex-grow: 1; overflow-y: auto;">
-            <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE PERS/ANIMAL')">RESCATE PERS/ANIMAL</button>
-            <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE TECNICO')">RESCATE TECNICO</button>
-            <button class="btn-tipo btn-rescate" onclick="seleccionar(this, 'RESCATE ACUATICO')">RESCATE ACUATICO</button>
-            <button class="btn-tipo btn-accidente" onclick="seleccionar(this, 'ACCIDENTE')">ACCIDENTE</button>
-            <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO FORESTAL')">INCENDIO FORESTAL</button>
-            <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO ESTRUCTURAL')">INCENDIO ESTRUCTURAL</button>
-            <button class="btn-tipo btn-incendio" onclick="seleccionar(this, 'INCENDIO VEHICULAR')">INCENDIO VEHICULAR</button>
+            <button class="btn-tipo" style="background: #2980b9;" onclick="seleccionar(this, 'RESCATE PERS/ANIMAL')">RESCATE PERS/ANIMAL</button>
+            <button class="btn-tipo" style="background: #2980b9;" onclick="seleccionar(this, 'RESCATE TECNICO')">RESCATE TECNICO</button>
+            <button class="btn-tipo" style="background: #f1c40f; color:black;" onclick="seleccionar(this, 'ACCIDENTE')">ACCIDENTE</button>
+            <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO FORESTAL')">INCENDIO FORESTAL</button>
+            <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO ESTRUCTURAL')">INCENDIO ESTRUCTURAL</button>
+            <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO VEHICULAR')">INCENDIO VEHICULAR</button>
         </div>
-        <button class="btn-action" onclick="ejecutarDespacho()">ENVIAR DESPACHO</button>
-        <p id="mqtt-status" style="font-size:11px; color:#e74c3c; text-align:center; margin-top:10px;">CONECTANDO...</p>
+
+        <button class="btn-action" onclick="ejecutarDespacho()">REGISTRAR SALIDA</button>
     </div>
 </div>
 
 <div id="panel-bitacora" class="full-panel">
     <button class="close-btn" onclick="cerrarPaneles()">×</button>
     <div id="bitacora-content">
-        <h2 style="color:var(--primary); text-align: center;">LIBRO DE GUARDIA</h2>
-        <div id="bit-login" style="max-width: 400px; margin: 50px auto; text-align: center; background: var(--card); padding: 40px; border-radius: 12px; border: 1px solid #444;">
+        <h2 style="color:var(--primary); font-size: 35px; margin-bottom: 20px;">LIBRO DE GUARDIA</h2>
+        
+        <div id="bit-login">
+            <h3 style="margin-top:0; font-size:14px; text-align:center;">INGRESO DE PERSONAL</h3>
             <input type="text" id="u-bit" class="input-std" placeholder="Usuario">
             <input type="password" id="p-bit" class="input-std" placeholder="Contraseña">
-            <button class="btn-action" onclick="loginBitacora()" style="margin-top:20px;">INGRESAR</button>
+            <button class="btn-action" onclick="loginBitacora()" style="padding:15px; font-size:14px;">ACCEDER</button>
         </div>
-        <div id="bit-ui" style="display:none; height: 100%; flex-direction: column;">
+
+        <div id="bit-ui">
             <div id="historial-bit"></div>
-            <div style="display:flex; gap:15px; background: rgba(0,0,0,0.4); padding: 20px;">
-                <textarea id="text-novedad" class="input-std" style="height:100px; resize:none; flex-grow:1;" placeholder="Escriba la novedad..."></textarea>
-                <button class="btn-action" style="width:180px;" onclick="guardarNovedad()">REGISTRAR</button>
+            <div style="display:flex; gap:10px; align-items: flex-end;">
+                <textarea id="text-novedad" class="input-std" style="height:80px; resize:none;" placeholder="Escriba la novedad aquí..."></textarea>
+                <button class="btn-action" style="width:150px; height:80px; font-size:14px;" onclick="guardarNovedad()">GRABAR</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    let map, marker, client, lat, lon, tipoSeleccionado = "";
+    let map, marker, lat, lon, tipoSeleccionado = "";
     let usuarioLogueado = "";
 
     const firebaseConfig = {
@@ -107,23 +106,15 @@
     const db = firebase.database();
 
     function abrirPanel(id) {
-        document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
+        cerrarPaneles();
         document.getElementById(id).classList.add('active');
         if(id === 'panel-despacho' && map) {
-            setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 500);
+            setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 400);
         }
     }
 
-    function cerrarPaneles() {
-        document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
-    }
-
-    function conectarMQTT() {
-        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_C_" + Math.random().toString(16).slice(2, 6));
-        client.connect({ useSSL: true, onSuccess: () => {
-            document.getElementById('mqtt-status').innerText = "SISTEMA ONLINE";
-            document.getElementById('mqtt-status').style.color = "#2ecc71";
-        }});
+    function cerrarPaneles() { 
+        document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active')); 
     }
 
     function seleccionar(btn, tipo) {
@@ -133,34 +124,18 @@
     }
 
     function ejecutarDespacho() {
-        let direccionRaw = document.getElementById('pac-input').value;
-        if (!tipoSeleccionado || !lat) return alert("Error: Datos incompletos.");
+        let inputCalle = document.getElementById('pac-input');
+        if (!tipoSeleccionado || !lat) return alert("Faltan datos de siniestro o ubicación.");
 
-        let calleLimpia = direccionRaw.split(',')[0];
-        const alerta = { aviso: tipoSeleccionado, direccion: calleLimpia, lat: lat, lon: lon, timestamp: Date.now() };
-        
-        // Enviar por MQTT
-        const message = new Paho.MQTT.Message(JSON.stringify(alerta));
-        message.destinationName = "bomberos/unidad/B1";
-        client.send(message);
+        // Guardar en Firebase local para historial si lo deseas, o solo limpiar campos
+        alert("DESPACHO REGISTRADO LOCALMENTE");
 
-        // VENTANA EMERGENTE DEL NAVEGADOR (POP-UP)
-        const ancho = 800; const alto = 600;
-        const x = (screen.width / 2) - (ancho / 2);
-        const y = (screen.height / 2) - (alto / 2);
-        
-        const popup = window.open("", "DespachoB1", `width=${ancho},height=${alto},left=${x},top=${y}`);
-        popup.document.write(`
-            <html><head><title>ALERTA</title></head>
-            <body style="background:#000; color:#fff; font-family:Arial; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; border:20px solid #e67e22; box-sizing:border-box;">
-                <h2 style="color:#aaa; margin:0; letter-spacing:5px;">DESPACHO ENVIADO</h2>
-                <h1 style="font-size:80px; color:#ff3333; text-transform:uppercase; margin:20px 0; text-align:center;">${tipoSeleccionado}</h1>
-                <h2 style="font-size:40px; margin:0;">${calleLimpia}</h2>
-                <button onclick="window.close()" style="margin-top:40px; padding:15px 30px; font-weight:bold; cursor:pointer;">CERRAR VENTANA</button>
-            </body></html>
-        `);
-
-        cerrarPaneles();
+        // VACIAR CAMPOS (Cumpliendo tu instrucción de limpieza)
+        inputCalle.value = "";
+        tipoSeleccionado = "";
+        document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
+        if (marker) marker.setMap(null);
+        lat = null; lon = null;
     }
 
     function loginBitacora() {
@@ -172,12 +147,12 @@
                 document.getElementById('bit-login').style.display = 'none';
                 document.getElementById('bit-ui').style.display = 'flex';
                 vincularBitacora();
-            } else { alert("Acceso denegado"); }
+            } else { alert("Usuario o clave incorrectos"); }
         });
     }
 
     function vincularBitacora() {
-        db.ref('bitacora').limitToLast(100).on('value', snap => {
+        db.ref('bitacora').limitToLast(50).on('value', snap => {
             const box = document.getElementById('historial-bit');
             box.innerHTML = "";
             snap.forEach(child => {
@@ -193,7 +168,6 @@
         if(!text.value.trim()) return;
         db.ref('bitacora').push({
             usuario: usuarioLogueado,
-            hora: new Date().toLocaleTimeString(),
             fecha: new Date().toLocaleDateString('es-AR'),
             texto: text.value.trim()
         });
@@ -201,17 +175,13 @@
     }
 
     function initMap() {
-        const centro = { lat: -35.576, lng: -58.010 };
         map = new google.maps.Map(document.getElementById("map-full"), {
-            zoom: 14, center: centro,
+            zoom: 14, center: { lat: -35.576, lng: -58.010 },
             styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
         });
-        const bounds = new google.maps.LatLngBounds(
-            new google.maps.LatLng(-35.900, -58.300),
-            new google.maps.LatLng(-35.400, -57.700)
-        );
+        const bounds = new google.maps.LatLngBounds(new google.maps.LatLng(-35.9, -58.3), new google.maps.LatLng(-35.4, -57.7));
         const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), {
-            bounds: bounds, componentRestrictions: { country: "ar" }, strictBounds: true
+            bounds: bounds, strictBounds: true
         });
         auto.addListener("place_changed", () => {
             const p = auto.getPlace(); if (!p.geometry) return;
@@ -220,7 +190,6 @@
             marker = new google.maps.Marker({ position: {lat, lng: lon}, map: map });
             map.panTo({lat, lng: lon});
         });
-        conectarMQTT();
     }
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0_KPxSHGYgf-ewC3Cha0yH-ey8-up9ds&libraries=places&callback=initMap" async defer></script>
