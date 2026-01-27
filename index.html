@@ -68,7 +68,7 @@
             iconSize: [20, 20], iconAnchor: [10, 10]
         });
 
-        // --- CONFIGURACIÓN MQTT (COMUNICACIÓN) ---
+                // --- CONFIGURACIÓN MQTT (COMUNICACIÓN) ---
         var clienteId = "unidad_" + Math.floor(Math.random() * 10000);
         var client = new Paho.MQTT.Client("wss://broker.hivemq.com:443/mqtt", clienteId);
 
@@ -76,7 +76,6 @@
             document.getElementById('header').innerText = "CONEXIÓN PERDIDA";
             document.getElementById('header').style.background = "#555";
         };
-
         client.onMessageArrived = function(message) {
             try {
                 var data = JSON.parse(message.payloadString);
@@ -148,4 +147,5 @@
     </script>
 </body>
 </html>
+
 
