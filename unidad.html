@@ -10,53 +10,71 @@
     
     <style>
         :root { --primary: #e67e22; --danger: #c0392b; --success: #27ae60; --dark: #0f0f0f; }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow-x: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: #000; color: white; overflow: hidden; }
         .bg-unidad { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('camion2.jpg') center/cover; z-index: 1; }
         .main-container { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100%; }
-        .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; }
+        
+        /* Barra de Estado */
+        .status-bar { background: var(--danger); padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; font-size: 1.2rem; }
+        
         .navigation-zone { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         #alerta-info-box { display: none; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 12px; border-left: 8px solid var(--primary); width: 90%; max-width: 450px; }
+        
         .controls { background: var(--dark); padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn-op { padding: 20px; border: none; border-radius: 10px; color: white; font-weight: 900; text-transform: uppercase; cursor: pointer; }
-        
-        /* FORMULARIO ESTILO CHASCOMÚS */
-        #form-parte { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; }
-        .seccion-titulo { background: var(--primary); color: white; padding: 8px; margin: 15px 0 10px 0; font-weight: bold; text-transform: uppercase; font-size: 14px; }
+
+        /* Overlay de Alerta Entrante */
+        #alerta-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; animation: flash 1s infinite; }
+        @keyframes flash { 0% { background: #000; } 50% { background: #500; } 100% { background: #000; } }
+
+        /* Formulario del Acta */
+        #form-parte { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 10000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; box-sizing: border-box; }
+        .seccion-titulo { background: var(--primary); color: white; padding: 8px; margin: 15px 0 10px 0; font-weight: bold; text-transform: uppercase; font-size: 13px; }
         .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .input-f { width: 100%; padding: 12px; margin-bottom: 5px; background: #2b2b2b; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; }
-        label { font-size: 11px; color: #aaa; text-transform: uppercase; }
+        .input-f { width: 100%; padding: 12px; margin-bottom: 5px; background: #2b2b2b; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        label { font-size: 11px; color: #aaa; text-transform: uppercase; display: block; margin-top: 5px; }
     </style>
 </head>
 <body>
     <div class="bg-unidad"></div>
+
     <div class="main-container">
         <div class="status-bar" id="status-txt">🚒 UNIDAD B1: DISPONIBLE</div>
+        
         <div class="navigation-zone">
             <div id="alerta-info-box">
                 <h2 id="txt-evento" style="color:var(--primary); margin:0;"></h2>
-                <p id="txt-dir" style="font-size: 1.3rem; margin: 10px 0;"></p>
+                <p id="txt-dir" style="font-size: 1.5rem; margin: 10px 0;"></p>
+                <a href="#" id="btn-maps" style="display:block; background:var(--primary); color:white; text-align:center; padding:15px; text-decoration:none; border-radius:8px; font-weight:bold;">ABRIR GPS</a>
             </div>
         </div>
+
         <div class="controls">
             <button class="btn-op" style="background:var(--primary)" onclick="enviarEstado('LLEGADA')">LLEGADA</button>
             <button class="btn-op" style="background:var(--success)" onclick="abrirFormulario()">FINALIZAR</button>
         </div>
     </div>
 
+    <div id="alerta-overlay" onclick="aceptarAlerta()">
+        <h1 style="font-size: 3rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
+        <div id="msg-alerta" style="margin: 30px; font-size: 2rem; font-weight: bold;"></div>
+        <button class="btn-op" style="background: #fff; color: #000; padding: 20px 50px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
+    </div>
+
     <div id="form-parte">
-        <h3 style="text-align:center; margin:0;">ACTA DE ACCIDENTE - B.V. CHASCOMÚS</h3>
+        <h3 style="text-align:center; margin:0;">PARTE DE SALIDA - B.V. CHASCOMÚS</h3>
         
         <div class="seccion-titulo">Horarios</div>
         <div class="grid-form">
             <div><label>Llamado</label><input type="time" id="h-llamado" class="input-f"></div>
             <div><label>Llegada Lugar</label><input type="time" id="h-llegada" class="input-f"></div>
             <div><label>Fin Trabajo</label><input type="time" id="h-fin" class="input-f"></div>
-            <div><label>Llegada Cuartel</label><input type="time" id="h-cuartel" class="input-f"></div>
+            <div><label>Regreso Cuartel</label><input type="time" id="h-cuartel" class="input-f"></div>
         </div>
 
         <div class="seccion-titulo">Localización</div>
         <input type="text" id="f-calle" class="input-f" placeholder="Calle / Ruta / KM">
-        <input type="text" id="f-entre" class="input-f" placeholder="Entre calles">
+        <input type="text" id="f-entre" class="input-f" placeholder="Entre calles / Localidad">
 
         <div class="seccion-titulo">Damnificados / Intervinientes</div>
         <div class="grid-form">
@@ -65,25 +83,64 @@
         </div>
 
         <div class="seccion-titulo">Vehículos Afectados</div>
-        <input type="text" id="v-marca" class="input-f" placeholder="Marca y Modelo">
+        <input type="text" id="v-marca" class="input-f" placeholder="Marca, Modelo y Color">
         <input type="text" id="v-dominio" class="input-f" placeholder="Dominio (Patente)">
-        <input type="text" id="v-seguro" class="input-f" placeholder="Compañía de Seguros">
+        <input type="text" id="v-seguro" class="input-f" placeholder="Compañía de Seguro y Póliza">
 
         <div class="seccion-titulo">Responsables</div>
-        <input type="text" id="r-dotacion" class="input-f" placeholder="Jefe de Dotación">
-        <input type="text" id="r-policia" class="input-f" placeholder="Policía a cargo">
-        <input type="text" id="r-medico" class="input-f" placeholder="Médico a cargo">
+        <input type="text" id="r-cargo" class="input-f" placeholder="Oficial / Jefe de Dotación">
+        <input type="text" id="r-chofer" class="input-f" placeholder="Chofer de Unidad">
+        <input type="text" id="r-policia" class="input-f" placeholder="Personal Policial / Médico">
 
-        <textarea id="f-obs" class="input-f" style="height:80px; margin-top:10px;" placeholder="Observaciones generales..."></textarea>
+        <textarea id="f-obs" class="input-f" style="height:100px; margin-top:10px;" placeholder="Detalle del servicio y observaciones..."></textarea>
 
-        <button class="btn-op" style="background:var(--success); width:100%;" onclick="generarPDFFinal()">GENERAR PDF OFICIAL</button>
+        <button class="btn-op" style="background:var(--success); width:100%; margin-top:10px;" onclick="generarPDFFinal()">GENERAR PDF Y CERRAR</button>
         <button class="btn-op" style="background:#444; width:100%; margin-top:10px;" onclick="cerrarFormulario()">CANCELAR</button>
     </div>
 
     <script>
-        let datosMQTT = { aviso: "ACCIDENTE", direccion: "" };
+        let client;
+        let datosAlertaActual = { aviso: "ACCIDENTE", direccion: "" };
 
-        function abrirFormulario() { document.getElementById('form-parte').style.display = 'flex'; }
+        // CONEXIÓN MQTT REESTABLECIDA
+        function conectarMQTT() {
+            const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 5);
+            client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
+            
+            client.onMessageArrived = (msg) => {
+                try {
+                    const data = JSON.parse(msg.payloadString);
+                    if (data.aviso && data.direccion) {
+                        datosAlertaActual = data;
+                        document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
+                        document.getElementById('alerta-overlay').style.display = 'flex';
+                        if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+                    }
+                } catch(e) { console.error("Error MQTT:", e); }
+            };
+
+            client.connect({ 
+                useSSL: true, 
+                onSuccess: () => { client.subscribe("bomberos/unidad/B1"); },
+                onFailure: () => setTimeout(conectarMQTT, 5000)
+            });
+        }
+
+        function aceptarAlerta() {
+            document.getElementById('alerta-overlay').style.display = 'none';
+            document.getElementById('alerta-info-box').style.display = 'block';
+            document.getElementById('txt-evento').innerText = datosAlertaActual.aviso;
+            document.getElementById('txt-dir').innerText = datosAlertaActual.direccion;
+            document.getElementById('btn-maps').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(datosAlertaActual.direccion + ", Chascomus")}`;
+            document.getElementById('status-txt').innerText = "🚨 EN SERVICIO";
+            document.getElementById('status-txt').style.background = "#27ae60";
+        }
+
+        function abrirFormulario() {
+            document.getElementById('f-calle').value = datosAlertaActual.direccion;
+            document.getElementById('form-parte').style.display = 'flex';
+        }
+
         function cerrarFormulario() { document.getElementById('form-parte').style.display = 'none'; }
 
         function generarPDFFinal() {
@@ -91,54 +148,58 @@
             const doc = new jsPDF();
             const width = doc.internal.pageSize.getWidth();
 
-            // Encabezado Oficial 
+            // Encabezado
             doc.setFontSize(14); doc.setFont("helvetica", "bold");
             doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMUS", width/2, 15, {align: "center"});
             doc.setFontSize(9); doc.setFont("helvetica", "normal");
-            doc.text("Fundada el 19 de Noviembre de 1960 | Soler 347 - Tel: 02241 42 4059", width/2, 20, {align: "center"});
+            doc.text("Soler 347 - Tel: 02241 42 4059 | Chascomús, Buenos Aires", width/2, 20, {align: "center"});
             doc.line(15, 25, 195, 25);
 
-            // Título del reporte [cite: 3]
-            doc.setFontSize(16); doc.setFont("helvetica", "bold");
-            doc.text("ACTA DE " + datosMQTT.aviso, width/2, 35, {align: "center"});
-
-            // Datos rellenados [cite: 7, 12, 46, 54]
-            const rows = [
-                ["FECHA", new Date().toLocaleDateString(), "LOCALIZACIÓN", document.getElementById('f-calle').value],
-                ["HORA LLAMADO", document.getElementById('h-llamado').value, "HORA LLEGADA", document.getElementById('h-llegada').value],
+            // Datos del Formulario
+            doc.setFontSize(14); doc.text("ACTA DE INTERVENCIÓN - UNIDAD B1", 15, 35);
+            
+            const tableData = [
+                ["SINIESTRO", datosAlertaActual.aviso, "FECHA", new Date().toLocaleDateString()],
+                ["CALLE/RUTA", document.getElementById('f-calle').value, "CRUCE", document.getElementById('f-entre').value],
+                ["LLAMADO", document.getElementById('h-llamado').value, "LLEGADA", document.getElementById('h-llegada').value],
+                ["FIN TRABAJO", document.getElementById('h-fin').value, "CUARTEL", document.getElementById('h-cuartel').value],
                 ["HERIDOS", document.getElementById('d-heridos').value, "FALLECIDOS", document.getElementById('d-fallecidos').value],
-                ["VEHÍCULO", document.getElementById('v-marca').value, "DOMINIO", document.getElementById('v-dominio').value],
-                ["SEGURO", document.getElementById('v-seguro').value, "POLICÍA A CARGO", document.getElementById('r-policia').value],
-                ["MÉDICO A CARGO", document.getElementById('r-medico').value, "JEFE DOTACIÓN", document.getElementById('r-dotacion').value]
+                ["VEHÍCULO", document.getElementById('v-marca').value, "PATENTE", document.getElementById('v-dominio').value],
+                ["SEGURO", document.getElementById('v-seguro').value, "A CARGO", document.getElementById('r-cargo').value]
             ];
 
             doc.autoTable({
-                startY: 45,
-                body: rows,
+                startY: 40,
+                body: tableData,
                 theme: 'grid',
-                styles: { fontSize: 10, cellPadding: 3 },
-                columnStyles: { 0: {fontStyle: 'bold', fillColor: [240, 240, 240]}, 2: {fontStyle: 'bold', fillColor: [240, 240, 240]} }
+                styles: { fontSize: 10 },
+                columnStyles: { 0: {fillColor: [230, 230, 230], fontStyle: 'bold'}, 2: {fillColor: [230, 230, 230], fontStyle: 'bold'} }
             });
 
             doc.setFont("helvetica", "bold");
-            doc.text("OBSERVACIONES:", 15, doc.lastAutoTable.finalY + 15);
+            doc.text("OBSERVACIONES Y DETALLE:", 15, doc.lastAutoTable.finalY + 10);
             doc.setFont("helvetica", "normal");
-            const obs = doc.splitTextToSize(document.getElementById('f-obs').value, 170);
-            doc.text(obs, 15, doc.lastAutoTable.finalY + 22);
+            const obs = doc.splitTextToSize(document.getElementById('f-obs').value, 175);
+            doc.text(obs, 15, doc.lastAutoTable.finalY + 17);
 
-            // Firmas 
-            const finalY = doc.internal.pageSize.getHeight() - 30;
-            doc.line(20, finalY, 80, finalY); doc.text("JEFE DE DOTACIÓN", 35, finalY + 5);
-            doc.line(130, finalY, 190, finalY); doc.text("POLICÍA / RESPONSABLE", 140, finalY + 5);
+            // Firmas
+            const footerY = 270;
+            doc.line(20, footerY, 80, footerY); doc.text("JEFE DE DOTACIÓN", 35, footerY + 5);
+            doc.line(130, footerY, 190, footerY); doc.text("INTERVINIENTE / POLICÍA", 140, footerY + 5);
 
             doc.save(`ACTA_B1_${Date.now()}.pdf`);
             cerrarFormulario();
+            resetearInterfaz();
         }
-        
-        // Simulación de recepción de datos para pruebas
-        window.onload = () => {
-            // Aquí iría tu lógica MQTT previa
-        };
+
+        function resetearInterfaz() {
+            document.getElementById('alerta-info-box').style.display = 'none';
+            document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
+            document.getElementById('status-txt').style.background = "#c0392b";
+            document.querySelectorAll('.input-f').forEach(i => i.value = "");
+        }
+
+        window.onload = conectarMQTT;
     </script>
 </body>
 </html>
