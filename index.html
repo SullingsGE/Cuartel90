@@ -1,97 +1,71 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
     <meta charset="utf-8" />
-    <title>Terminal Táctica</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Test Final</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #121212; font-family: sans-serif; }
+        body { margin: 0; font-family: sans-serif; background: #121212; color: white; }
         #map { height: 100vh; width: 100vw; }
         #header {
             position: absolute; top: 0; width: 100%; z-index: 1000;
-            background: #2c3e50; color: white; text-align: center;
-            padding: 15px 0; font-weight: bold;
+            background: #2c3e50; padding: 20px 0; text-align: center; font-weight: bold;
         }
-        #log-status {
-            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-            background: rgba(0,0,0,0.8); color: #00ff00;
-            padding: 10px; border-radius: 5px; font-size: 10px; font-family: monospace;
+        #debug {
+            position: absolute; bottom: 10px; left: 10px; z-index: 1000;
+            background: rgba(0,0,0,0.8); color: #0f0; padding: 10px; font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div id="header">CONECTANDO...</div>
-    <div id="log-status">Iniciando...</div>
+    <div id="header">ESTADO: INICIANDO...</div>
+    <div id="debug">Log: Esperando...</div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // 1. Mapa
-        var map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
+        // Log para ver errores en el celular
+        function log(t) { document.getElementById('debug').innerText = t; console.log(t); }
+
+        // 1. Mapa Simple
+        var map = L.map('map').setView([40.41, -3.70], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        var userMarker, routingControl;
 
-        // 2. MQTT Configuración para EMQX (Puerto 443 / Path /mqtt)
-        var host = "broker.emqx.io";
-        var port = 443;
-        var path = "/mqtt";
-        var clientId = "movil_" + Math.random().toString(16).substr(2, 8);
-        var client = new Paho.MQTT.Client("wss://" + host + ":" + port + path, clientId);
-
-        function log(m) { document.getElementById('log-status').innerText = m; console.log(m); }
+        // 2. MQTT con configuración de máxima compatibilidad
+        var clientId = "user_" + Math.floor(Math.random() * 1000);
+        // Usamos la URL completa para no dejar dudas al navegador
+        var client = new Paho.MQTT.Client("wss://broker.emqx.io:443/mqtt", clientId);
 
         client.onMessageArrived = function(msg) {
-            log("AVISO!");
+            log("¡MENSAJE RECIBIDO!");
             var d = JSON.parse(msg.payloadString);
-            document.getElementById('header').innerText = "ALERTA: " + d.aviso;
-            document.getElementById('header').style.background = "#c0392b";
-            
-            var dest = L.latLng(d.lat, d.lon);
-            if (routingControl) map.removeControl(routingControl);
-            
-            routingControl = L.Routing.control({
-                waypoints: [userMarker ? userMarker.getLatLng() : map.getCenter(), dest],
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                createMarker: function() { return null; }
-            }).addTo(map);
-            map.flyTo(dest, 16);
+            document.getElementById('header').innerText = "AVISO: " + d.aviso;
+            document.getElementById('header').style.background = "red";
+            L.marker([d.lat, d.lon]).addTo(map).bindPopup(d.aviso).openPopup();
+            map.flyTo([d.lat, d.lon], 16);
         };
 
-        function conectar() {
-            log("Intentando conectar a EMQX...");
-            client.connect({
-                useSSL: true,
-                onSuccess: function() {
-                    log("CONECTADO");
-                    document.getElementById('header').innerText = "ESPERANDO SERVICIO";
-                    document.getElementById('header').style.background = "#27ae60";
-                    client.subscribe("bomberos/unidad/B1");
-                },
-                onFailure: function(e) { 
-                    log("Error: " + e.errorMessage); 
-                    setTimeout(conectar, 5000); 
-                }
-            });
-        }
-
-        // 3. GPS
-        map.on('locationfound', function(e) {
-            if (!userMarker) {
-                userMarker = L.circleMarker(e.latlng, {radius: 8, color: 'red'}).addTo(map);
-                map.setView(e.latlng, 16);
-            } else {
-                userMarker.setLatLng(e.latlng);
-                if (routingControl) routingControl.spliceWaypoints(0, 1, e.latlng);
+        var options = {
+            useSSL: true,
+            timeout: 3,
+            onSuccess: function() {
+                log("CONECTADO OK");
+                document.getElementById('header').innerText = "ESPERANDO SERVICIO";
+                document.getElementById('header').style.background = "green";
+                client.subscribe("bomberos/unidad/B1");
+            },
+            onFailure: function(e) {
+                log("FALLO: " + e.errorMessage);
+                // Intento de reconexión automática
+                setTimeout(function(){ location.reload(); }, 5000);
             }
-        });
+        };
 
-        map.locate({ watch: true, enableHighAccuracy: true });
-        conectar();
+        log("Llamando a connect...");
+        client.connect(options);
     </script>
 </body>
 </html>
