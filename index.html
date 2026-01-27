@@ -12,18 +12,17 @@
         #header { 
             position: absolute; top: 0; width: 100%; z-index: 1000; 
             background: #2c3e50; padding: 15px; text-align: center; 
-            font-weight: bold; border-bottom: 3px solid #e67e22; transition: 0.5s;
+            font-weight: bold; border-bottom: 3px solid #e67e22;
         }
         #console { 
             position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.8); 
-            height: 60px; font-size: 11px; padding: 10px; color: #0f0; z-index: 2000;
-            pointer-events: none; overflow-y: hidden;
+            height: 50px; font-size: 11px; padding: 10px; color: #0f0; z-index: 2000;
         }
     </style>
 </head>
 <body>
-    <div id="header">ESPERANDO SEÑAL GPS...</div>
-    <div id="console">> Iniciando sistema...</div>
+    <div id="header">INICIALIZANDO GPS...</div>
+    <div id="console">> Sistema listo.</div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,7 +30,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 
     <script>
-        const log = (m) => { document.getElementById('console').innerHTML = "> " + m; };
+        const log = (m) => { document.getElementById('console').innerText = "> " + m; };
         var map = L.map('map', {zoomControl: false}).setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -39,26 +38,26 @@
         var marcadorUnidad = null;
         var rutaActual = null;
 
-        // GPS
+        // GPS Real-time
         map.on('locationfound', (e) => {
             miPosicion = e.latlng;
             if (!marcadorUnidad) {
-                marcadorUnidad = L.circleMarker(miPosicion, {radius: 9, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.9}).addTo(map);
+                marcadorUnidad = L.circleMarker(miPosicion, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.8}).addTo(map);
                 map.setView(miPosicion, 16);
-                log("GPS: Posición fijada");
+                document.getElementById('header').innerText = "UNIDAD B1 - EN SERVICIO";
+                document.getElementById('header').style.background = "#27ae60";
             } else {
                 marcadorUnidad.setLatLng(miPosicion);
-                if (rutaActual) rutaActual.spliceWaypoints(0, 1, miPosicion);
             }
         });
         map.locate({watch: true, enableHighAccuracy: true});
 
-        // MQTT Celular
+        // MQTT Config
         var client = new Paho.MQTT.Client("wss://broker.hivemq.com:8884/mqtt", "CEL_B1_" + Math.random().toString(16).substr(2, 4));
         
         client.onMessageArrived = (msg) => {
             const data = JSON.parse(msg.payloadString);
-            log("ALERTA: " + data.aviso);
+            log("AVISO: " + data.aviso);
             document.getElementById('header').innerText = "ALERTA: " + data.aviso;
             document.getElementById('header').style.background = "#c0392b";
 
@@ -67,27 +66,23 @@
             
             rutaActual = L.Routing.control({
                 waypoints: [miPosicion || map.getCenter(), destino],
-                lineOptions: { styles: [{ color: '#e67e22', weight: 7 }] },
+                lineOptions: { styles: [{ color: '#e67e22', weight: 8 }] },
                 createMarker: function() { return null; },
                 addWaypoints: false
             }).addTo(map);
             map.flyTo(destino, 15);
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
         };
 
         function conectar() {
             client.connect({
                 useSSL: true,
-                onSuccess: () => {
-                    log("CONECTADO A CENTRAL");
-                    document.getElementById('header').innerText = "UNIDAD B1 - LISTA";
-                    document.getElementById('header').style.background = "#27ae60";
-                    client.subscribe("bomberos/unidad/B1", {qos: 1});
-                },
-                onFailure: () => { log("Reintentando conexión..."); setTimeout(conectar, 5000); }
+                onSuccess: () => { log("CONECTADO A CENTRAL"); client.subscribe("bomberos/unidad/B1"); },
+                onFailure: () => { setTimeout(conectar, 5000); }
             });
         }
         conectar();
     </script>
 </body>
 </html>
+
