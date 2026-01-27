@@ -2,81 +2,98 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>MONITOR REMOTO B1</title>
+    <title>MONITOR REMOTO B1 - CHASCOMÚS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; color: white; font-family: 'Arial Black', sans-serif; overflow: hidden; }
         
-        /* ESTADO DE ESPERA: Imagen que se ve siempre */
+        /* ESTADO DE ESPERA: Escudo del cuartel centrado */
         #standby {
             position: fixed; width: 100%; height: 100%;
-            background: url('cuartel.jpg') no-repeat center center;
-            background-size: cover;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 1;
         }
-        #standby img { width: 300px; filter: drop-shadow(0 0 20px rgba(0,0,0,1)); }
-        #standby h1 { font-size: 40px; text-shadow: 2px 2px 10px #000; opacity: 0.8; margin-top: 20px; }
+        #standby img { width: 450px; filter: drop-shadow(0 0 30px rgba(230, 126, 34, 0.5)); }
+        #standby h1 { font-size: 50px; color: #e67e22; margin-top: 30px; letter-spacing: 5px; text-transform: uppercase; }
 
-        /* ESTADO DE ALERTA: Se activa al recibir despacho */
+        /* ESTADO DE ALERTA: Sobrescribe todo */
         #alerta {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 10;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            border: 30px solid #e67e22; box-sizing: border-box;
-            animation: border-pulse 1s infinite;
+            display: none; /* Se activa por JS */
+            flex-direction: column; align-items: center; justify-content: center;
+            border: 40px solid #ff0000; box-sizing: border-box;
+            text-align: center;
         }
 
-        @keyframes border-pulse { 0% { border-color: #e67e22; } 50% { border-color: #ff0000; } 100% { border-color: #e67e22; } }
-
-        .txt-aviso { font-size: 10vw; color: #ff3333; text-transform: uppercase; margin: 0; text-align: center; line-height: 1; }
-        .txt-calle { font-size: 5vw; color: #fff; margin-top: 40px; text-align: center; }
+        .txt-aviso { font-size: 11vw; color: #ff3333; text-transform: uppercase; margin: 0; line-height: 0.9; font-weight: 900; }
+        .txt-calle { font-size: 6vw; color: #fff; margin-top: 50px; font-weight: bold; }
+        
+        .btn-reset { 
+            margin-top: 60px; padding: 20px 50px; font-size: 25px; 
+            background: #e67e22; color: white; border: none; border-radius: 10px;
+            cursor: pointer; font-weight: bold; text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
 
 <div id="standby">
-    <img src="escudo.png" alt="Escudo">
-    <h1>SISTEMA DE DESPACHO B1 - CHASCOMÚS</h1>
+    <img src="escudo.png" alt="Escudo Bomberos">
+    <h1>CENTRAL B1 CHASCOMÚS</h1>
 </div>
 
 <div id="alerta">
-    <p style="font-size: 3vw; color: #aaa; letter-spacing: 10px; margin: 0;">SALIDA DE EMERGENCIA</p>
-    <h1 id="display-tipo" class="txt-aviso">TIPO</h1>
-    <h2 id="display-calle" class="txt-calle">CALLE</h2>
-    <button onclick="resetMonitor()" style="margin-top: 50px; padding: 15px 40px; font-size: 20px; cursor: pointer;">LIMPIAR PANTALLA</button>
+    <p style="font-size: 3vw; color: #aaa; letter-spacing: 15px; margin-bottom: 20px;">EMERGENCIA EN CURSO</p>
+    <h1 id="display-tipo" class="txt-aviso">---</h1>
+    <h2 id="display-calle" class="txt-calle">---</h2>
+    <button class="btn-reset" onclick="resetMonitor()">FINALIZAR ALERTA</button>
 </div>
 
 <script>
     let client;
 
     function conectar() {
-        // Generamos un ID de cliente único para el monitor
-        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "B1_MONITOR_" + Math.random().toString(16).slice(2, 5));
+        // ID único para evitar desconexiones
+        const clientId = "B1_MONITOR_HDMI_" + Math.floor(Math.random() * 1000);
+        client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
         
         client.onMessageArrived = (msg) => {
-            const data = JSON.parse(msg.payloadString);
-            mostrarAlerta(data);
+            try {
+                const data = JSON.parse(msg.payloadString);
+                mostrarAlerta(data);
+            } catch (e) { console.error("Error en datos recibidos"); }
+        };
+
+        client.onConnectionLost = (responseObject) => {
+            setTimeout(conectar, 3000); // Reintento automático
         };
 
         client.connect({ useSSL: true, onSuccess: () => {
             client.subscribe("bomberos/unidad/B1");
-            console.log("Monitor HDMI conectado y esperando...");
+            console.log("Monitor HDMI sincronizado.");
         }});
     }
 
     function mostrarAlerta(data) {
-        document.getElementById('alerta').style.display = 'flex';
+        // Al asignar innerText, eliminamos cualquier contenido anterior (no se acumula)
         document.getElementById('display-tipo').innerText = data.aviso;
         document.getElementById('display-calle').innerText = data.direccion;
         
-        // Opcional: Sonido de alerta
-        const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
-        audio.play();
+        // Cambiamos la vista de Standby a Alerta
+        document.getElementById('alerta').style.display = 'flex';
+        
+        // Opcional: Sonido si el navegador lo permite
+        const audio = new Audio('https://actions.google.com/sounds/v1/emergency/emergency_siren_short.ogg');
+        audio.play().catch(e => console.log("Audio bloqueado por el navegador"));
     }
 
     function resetMonitor() {
+        // Volvemos al estado de espera con el escudo
         document.getElementById('alerta').style.display = 'none';
+        document.getElementById('display-tipo').innerText = "---";
+        document.getElementById('display-calle').innerText = "---";
     }
 
     window.onload = conectar;
