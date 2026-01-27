@@ -2,62 +2,162 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>UNIDAD B1 - RECEPTOR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UNIDAD B1 - SISTEMA INTEGRAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <style>
-        body { margin: 0; background: #0b0e11; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        #header { background: #15191d; padding: 15px; text-align: center; border-bottom: 4px solid #e67e22; }
-        #contenido { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        .alerta { background: #1a2229; border-left: 8px solid #e67e22; padding: 25px; border-radius: 10px; width: 90%; text-align: center; display: none; }
-        #tipo { font-size: 32px; font-weight: bold; margin: 15px 0; }
-        #btn-nav { 
-            display: none; width: 100%; padding: 25px; background: #27ae60; color: white; 
-            text-decoration: none; font-size: 22px; font-weight: bold; text-align: center;
-        }
+        body { margin: 0; background: #0b0e11; color: white; font-family: sans-serif; }
+        /* Pestañas */
+        .tabs { display: flex; background: #15191d; border-bottom: 3px solid #e67e22; position: sticky; top: 0; z-index: 100; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; }
+        .tab-btn.active { color: #e67e22; border-bottom: 3px solid #e67e22; }
+        
+        .content { display: none; padding: 20px; }
+        .content.active { display: block; }
+
+        /* Formulario Informe */
+        .form-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; font-size: 12px; color: #e67e22; margin-bottom: 5px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #1a2229; color: white; box-sizing: border-box; }
+        
+        .btn-action { width: 100%; padding: 20px; margin: 10px 0; border-radius: 8px; font-weight: bold; border: none; color: white; cursor: pointer; }
+        #btn-nav { background: #27ae60; font-size: 18px; text-decoration: none; display: inline-block; text-align: center; width: 93%; }
+        .btn-pdf { background: #e74c3c; }
     </style>
 </head>
 <body>
-    <div id="header">
-        <div id="status">CONECTANDO...</div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('nav')">NAVEGACIÓN</button>
+        <button class="tab-btn" onclick="openTab('informe')">INFORME DE SERVICIO</button>
     </div>
 
-    <div id="contenido">
-        <div id="espera">ESPERANDO DESPACHO...</div>
-        <div class="alerta" id="caja-alerta">
-            <div style="color: #e67e22;">NUEVA EMERGENCIA</div>
-            <div id="tipo"></div>
-            <div id="hora" style="font-family: monospace; color: #888;"></div>
+    <div id="nav" class="content active">
+        <div id="status-top" style="color: #f1c40f; margin-bottom: 10px;">ESPERANDO DESPACHO...</div>
+        <div id="card-emergencia" style="background: #1a2229; padding: 20px; border-radius: 10px; border-left: 5px solid #e67e22; display: none;">
+            <h2 id="txt-aviso">---</h2>
+            <p id="txt-hora"></p>
+            <a id="btn-nav" href="#">INICIAR VIAJE (GPS)</a>
+            <button class="btn-action" style="background: #2980b9;" onclick="registrarEvento('llegada')">REGISTRAR LLEGADA AL LUGAR</button>
         </div>
     </div>
 
-    <a id="btn-nav" href="#">INICIAR VIAJE (GPS)</a>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
-    <script>
-        var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
+    <div id="informe" class="content">
+        <h3 style="color: #e67e22; border-bottom: 1px solid #333;">PLANILLA DE ACCIDENTE</h3>
         
+        <div class="form-group">
+            <label>Tipo de Accidente</label>
+            <select id="f-tipo">
+                <option value="Tránsito">Tránsito</option>
+                <option value="Aéreo">Aéreo</option>
+                <option value="Embarcaciones">Embarcaciones</option>
+                <option value="Otro">Otro</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Localización (Calle/Ruta y Km)</label>
+            <input type="text" id="f-ubicacion" placeholder="Ej: Ruta 2 Km 120">
+        </div>
+
+        <div class="form-group">
+            <label>Clima</label>
+            <select id="f-clima">
+                <option value="Soleado">Soleado</option>
+                <option value="Lluvia">Lluvia</option>
+                <option value="Neblina">Neblina</option>
+                <option value="Noche">Noche</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Víctimas (Heridos/Fallecidos)</label>
+            <textarea id="f-damnificados" rows="2" placeholder="Detalle de personas..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Observaciones / Vehículos</label>
+            <textarea id="f-obs" rows="4" placeholder="Dominio, Marca, Modelo..."></textarea>
+        </div>
+
+        <button class="btn-action btn-pdf" onclick="generarPDF()">GENERAR PLANILLA PDF</button>
+    </div>
+
+    <script>
+        // Lógica de Pestañas
+        function openTab(tabId) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // MQTT y Navegación
+        var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
+        var horaLlamado = "";
+
         client.onMessageArrived = function(msg) {
             var data = JSON.parse(msg.payloadString);
-            document.getElementById("espera").style.display = "none";
-            document.getElementById("caja-alerta").style.display = "block";
-            document.getElementById("tipo").innerText = data.aviso;
-            document.getElementById("hora").innerText = "Recibido: " + new Date().toLocaleTimeString();
+            horaLlamado = new Date().toLocaleTimeString();
+            document.getElementById("status-top").innerText = "SERVICIO EN CURSO";
+            document.getElementById("card-emergencia").style.display = "block";
+            document.getElementById("txt-aviso").innerText = data.aviso;
+            document.getElementById("txt-hora").innerText = "Llamado: " + horaLlamado;
+            document.getElementById("btn-nav").href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
             
-            // LINK DE NAVEGACIÓN
-            var link = `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lon}&travelmode=driving`;
-            var btn = document.getElementById("btn-nav");
-            btn.href = link;
-            btn.style.display = "block";
-
-            // Alerta sonora
-            var audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
-            audio.play();
+            // Auto-completar ubicación en el informe
+            document.getElementById("f-ubicacion").value = data.aviso;
         };
 
-        client.connect({ useSSL: true, onSuccess: function() {
-            document.getElementById("status").innerText = "UNIDAD B1 ONLINE";
-            client.subscribe("bomberos/unidad/B1");
-        }});
+        function registrarEvento(tipo) {
+            var hora = new Date().toLocaleTimeString();
+            client.send(new Paho.MQTT.Message(JSON.stringify({evento: tipo, hora: hora})), "bomberos/unidad/B1/estado");
+            alert("Evento '" + tipo + "' registrado a las " + hora);
+        }
+
+        // GENERACIÓN DE PDF PROFESIONAL
+        function generarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const f = (id) => document.getElementById(id).value;
+
+            // Encabezado según planilla oficial 
+            doc.setFontSize(14);
+            doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMUS", 10, 20);
+            doc.setFontSize(10);
+            doc.text("Fundada el 19 de Noviembre de 1960 - Soler 347", 10, 26);
+            
+            doc.line(10, 30, 200, 30);
+            doc.setFontSize(16);
+            doc.text("INFORME DE ACCIDENTE", 70, 40);
+
+            // Datos del Informe [cite: 8, 9, 14, 41]
+            doc.setFontSize(12);
+            doc.text(`TIPO: ${f('f-tipo')}`, 10, 55);
+            doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 130, 55);
+            doc.text(`HORA LLAMADO: ${horaLlamado}`, 10, 65);
+            doc.text(`LOCALIZACIÓN: ${f('f-ubicacion')}`, 10, 75);
+            doc.text(`CLIMA: ${f('f-clima')}`, 10, 85);
+
+            doc.text("DAMNIFICADOS:", 10, 100);
+            doc.setFontSize(10);
+            doc.text(doc.splitTextToSize(f('f-damnificados'), 180), 10, 107);
+
+            doc.setFontSize(12);
+            doc.text("OBSERVACIONES Y VEHÍCULOS:", 10, 130);
+            doc.setFontSize(10);
+            doc.text(doc.splitTextToSize(f('f-obs'), 180), 10, 137);
+
+            // Firmas [cite: 55]
+            doc.line(20, 260, 80, 260);
+            doc.text("JEFE DE DOTACIÓN", 35, 265);
+
+            doc.save(`Informe_B1_${Date.now()}.pdf`);
+        }
+
+        client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
     </script>
 </body>
 </html>
