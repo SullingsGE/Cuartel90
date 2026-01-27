@@ -2,193 +2,96 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Terminal Táctica de Emergencia</title>
+    <title>Terminal Táctica</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #121212; font-family: sans-serif; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
-        
+        body { margin: 0; padding: 0; background: #121212; font-family: sans-serif; }
+        #map { height: 100vh; width: 100vw; }
         #header {
             position: absolute; top: 0; width: 100%; z-index: 1000;
             background: #2c3e50; color: white; text-align: center;
-            padding: 15px 0; font-weight: bold; font-size: 1.1em;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            transition: background 0.5s;
+            padding: 15px 0; font-weight: bold;
         }
-
         #log-status {
-            position: absolute; bottom: 85px; left: 10px; z-index: 1000;
+            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
             background: rgba(0,0,0,0.8); color: #00ff00;
-            padding: 6px 12px; border-radius: 4px; font-size: 0.75em;
-            font-family: monospace; border: 1px solid #333;
-        }
-
-        #controls {
-            position: absolute; bottom: 25px; right: 20px; z-index: 1000;
-        }
-
-        .btn-follow {
-            background: white; border: none; width: 60px; height: 60px;
-            border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            padding: 10px; border-radius: 5px; font-size: 10px; font-family: monospace;
         }
     </style>
 </head>
 <body>
-
-    <div id="header">INICIALIZANDO SISTEMA...</div>
-    <div id="log-status">Cargando módulos...</div>
-    
-    <div id="controls">
-        <button class="btn-follow" onclick="toggleFollow()">📍</button>
-    </div>
-
+    <div id="header">CONECTANDO...</div>
+    <div id="log-status">Iniciando...</div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // --- 1. CONFIGURACIÓN DE MAPAS ---
-        var map = L.map('map', { zoomControl: false }).setView([0, 0], 18);
-        var followPlayer = true;
+        // 1. Mapa
+        var map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         var userMarker, routingControl;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        var fireIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div style='background-color:#e74c3c; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 12px rgba(231,76,60,0.9);'></div>",
-            iconSize: [22, 22], iconAnchor: [11, 11]
-        });
-
-        // --- 2. CONFIGURACIÓN MQTT (SHIFTR.IO COMPATIBILITY) ---
+        // 2. MQTT Configuración para EMQX (Puerto 443 / Path /mqtt)
         var host = "broker.emqx.io";
         var port = 443;
-        var clienteId = "unidad_bomberos_" + Math.floor(Math.random() * 10000);
+        var path = "/mqtt";
+        var clientId = "movil_" + Math.random().toString(16).substr(2, 8);
+        var client = new Paho.MQTT.Client("wss://" + host + ":" + port + path, clientId);
 
-        // La URL de conexión incluye el usuario 'public' y el password 'public'
-        var client = new Paho.MQTT.Client("wss://public:public@" + host + ":" + port, clienteId);
+        function log(m) { document.getElementById('log-status').innerText = m; console.log(m); }
 
-        client.onConnectionLost = function(responseObject) {
-            document.getElementById('header').innerText = "RECONECTANDO...";
-            document.getElementById('header').style.background = "#555";
-            log("Conexión perdida: " + responseObject.errorMessage);
-            setTimeout(conectarCentral, 3000);
+        client.onMessageArrived = function(msg) {
+            log("AVISO!");
+            var d = JSON.parse(msg.payloadString);
+            document.getElementById('header').innerText = "ALERTA: " + d.aviso;
+            document.getElementById('header').style.background = "#c0392b";
+            
+            var dest = L.latLng(d.lat, d.lon);
+            if (routingControl) map.removeControl(routingControl);
+            
+            routingControl = L.Routing.control({
+                waypoints: [userMarker ? userMarker.getLatLng() : map.getCenter(), dest],
+                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+                createMarker: function() { return null; }
+            }).addTo(map);
+            map.flyTo(dest, 16);
         };
 
-        client.onMessageArrived = function(message) {
-            try {
-                var data = JSON.parse(message.payloadString);
-                log("AVISO RECIBIDO: " + data.aviso);
-                navegarA(data.lat, data.lon, data.aviso);
-            } catch(e) {
-                log("Error: Mensaje JSON no válido");
-            }
-        };
-
-        function conectarCentral() {
-            log("Intentando puente Shiftr...");
-            client.connect({ 
+        function conectar() {
+            log("Intentando conectar a EMQX...");
+            client.connect({
                 useSSL: true,
-                timeout: 5,
-                keepAliveInterval: 30,
                 onSuccess: function() {
+                    log("CONECTADO");
                     document.getElementById('header').innerText = "ESPERANDO SERVICIO";
                     document.getElementById('header').style.background = "#27ae60";
-                    log("CONECTADO A BRIDGE (OK)");
                     client.subscribe("bomberos/unidad/B1");
                 },
-                onFailure: function(e) {
-                    log("Fallo SSL: " + e.errorMessage);
-                    // Fallback a puerto inseguro si el seguro falla
-                    reintentarModoSimple();
+                onFailure: function(e) { 
+                    log("Error: " + e.errorMessage); 
+                    setTimeout(conectar, 5000); 
                 }
             });
         }
 
-        function reintentarModoSimple() {
-            log("Probando modo simple (Puerto 80)...");
-            client = new Paho.MQTT.Client("ws://public:public@public.cloud.shiftr.io:80/mqtt", clienteId);
-            client.onMessageArrived = client.onMessageArrived; // Re-asignar handler
-            client.connect({
-                onSuccess: function() {
-                    document.getElementById('header').innerText = "ESPERANDO (MODO SIMPLE)";
-                    document.getElementById('header').style.background = "#f39c12";
-                    client.subscribe("bomberos/unidad/B1");
-                    log("Conectado por Puerto 80");
-                },
-                onFailure: function(err) {
-                    log("Error definitivo: " + err.errorMessage);
-                    document.getElementById('header').innerText = "ERROR DE RED";
-                }
-            });
-        }
-
-        // --- 3. LÓGICA DE NAVEGACIÓN Y GPS ---
-        function onLocationFound(e) {
-            var latlng = e.latlng;
+        // 3. GPS
+        map.on('locationfound', function(e) {
             if (!userMarker) {
-                userMarker = L.marker(latlng, {icon: fireIcon}).addTo(map);
-                log("GPS: Posición capturada");
-                map.setView(latlng, 18);
+                userMarker = L.circleMarker(e.latlng, {radius: 8, color: 'red'}).addTo(map);
+                map.setView(e.latlng, 16);
             } else {
-                userMarker.setLatLng(latlng);
-                if (routingControl) {
-                    routingControl.spliceWaypoints(0, 1, latlng);
-                }
+                userMarker.setLatLng(e.latlng);
+                if (routingControl) routingControl.spliceWaypoints(0, 1, e.latlng);
             }
-            if (followPlayer) map.panTo(latlng);
-        }
+        });
 
-        function navegarA(lat, lon, texto) {
-            document.getElementById('header').innerText = "ALERTA: " + texto;
-            document.getElementById('header').style.background = "#c0392b";
-            var destino = L.latLng(lat, lon);
-
-            if (routingControl) map.removeControl(routingControl);
-
-            routingControl = L.Routing.control({
-                waypoints: [userMarker.getLatLng(), destino],
-                lineOptions: { styles: [{ color: '#3498db', weight: 8, opacity: 0.8 }] },
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                createMarker: function() { return null; },
-                addWaypoints: false
-            }).addTo(map);
-
-            map.flyTo(destino, 16);
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-        }
-
-        function toggleFollow() {
-            followPlayer = !followPlayer;
-            log(followPlayer ? "Siguiendo GPS" : "Mapa desbloqueado");
-        }
-
-        function log(msg) {
-            document.getElementById('log-status').innerText = msg;
-            console.log(msg);
-        }
-
-        map.on('locationfound', onLocationFound);
-        map.on('locationerror', function(e) { log("Error GPS: " + e.message); });
-        
-        map.locate({ setView: false, watch: true, enableHighAccuracy: true });
-        
-        // Arrancamos la conexión
-        conectarCentral();
-
+        map.locate({ watch: true, enableHighAccuracy: true });
+        conectar();
     </script>
 </body>
 </html>
-
-
-
-
-
