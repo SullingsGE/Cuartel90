@@ -10,11 +10,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     
     <style>
-        :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; }
+        :root { --primary: #e67e22; --dark: #0b0e11; --card: #15191d; --success: #27ae60; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--dark); height: 100vh; overflow: hidden; color: white; }
         
-        /* BOTÓN VOLVER AGREGADO */
+        /* Botón Volver al Menú */
         .btn-back { position: fixed; top: 10px; left: 10px; z-index: 3000; background: #333; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 0.7rem; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
+
+        /* Notificación Profesional (Toast) */
+        .toast { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: var(--success); color: white; padding: 15px 35px; border-radius: 50px; font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 5000; display: none; animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid rgba(255,255,255,0.2); }
+        @keyframes slideUp { from { bottom: -60px; opacity: 0; } to { bottom: 25px; opacity: 1; } }
 
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
         .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
@@ -42,6 +46,8 @@
     </style>
 </head>
 <body>
+
+<div id="toast" class="toast">✅ OPERACIÓN EXITOSA</div>
 
 <a href="index.html" class="btn-back">« MENU</a>
 
@@ -104,6 +110,14 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    function mostrarAviso(texto, color = "#27ae60") {
+        const t = document.getElementById('toast');
+        t.innerText = texto;
+        t.style.background = color;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+
     function abrirPanel(id) {
         if(id === 'panel-despacho') { cerrarSesion(); } 
         document.querySelectorAll('.full-panel').forEach(p => p.classList.remove('active'));
@@ -136,9 +150,8 @@
 
     function ejecutarDespacho() {
         const direccionVal = document.getElementById('pac-input').value;
-        if (!tipoSeleccionado || !lat || !direccionVal) return alert("Faltan datos de ubicación");
+        if (!tipoSeleccionado || !lat || !direccionVal) return mostrarAviso("⚠️ Faltan datos de ubicación", "#c0392b");
 
-        // CORRECCIÓN: Se agrega timestamp: Date.now() para que la unidad acepte la alerta
         const alerta = {
             aviso: tipoSeleccionado,
             direccion: direccionVal,
@@ -151,8 +164,11 @@
             const message = new Paho.MQTT.Message(JSON.stringify(alerta));
             message.destinationName = "bomberos/unidad/B1"; 
             client.send(message);
-            alert("DESPACHO ENVIADO CON ÉXITO");
-        } else { conectarMQTT(); alert("Reconectando..."); }
+            mostrarAviso("✅ DESPACHO ENVIADO A UNIDAD B1");
+        } else { 
+            conectarMQTT(); 
+            mostrarAviso("❌ Error de conexión. Reintentando...", "#c0392b");
+        }
     }
 
     function loginBitacora() {
@@ -164,7 +180,8 @@
                 document.getElementById('bit-login').style.display = 'none';
                 document.getElementById('bit-ui').style.display = 'flex';
                 vincularBitacora();
-            } else { alert("Usuario o Clave incorrectos."); }
+                mostrarAviso("✅ Sesión iniciada: " + usuarioLogueado);
+            } else { mostrarAviso("❌ Usuario o Clave incorrectos", "#c0392b"); }
         });
     }
 
@@ -190,6 +207,7 @@
             texto: text.value.trim()
         });
         text.value = "";
+        mostrarAviso("✅ Novedad registrada");
     }
 
     function exportarPDF() {
@@ -203,7 +221,8 @@
             const fReg = new Date(p[2], p[1]-1, p[0]);
             return r.usuario === usuarioLogueado && fReg >= limite;
         });
-        if(filtrados.length === 0) return alert("No hay registros tuyos en los últimos 7 días.");
+        if(filtrados.length === 0) return mostrarAviso("ℹ️ No hay registros recientes", "#3498db");
+        
         const fS = hoy.toLocaleDateString('es-AR').replace(/\//g, "-");
         doc.setFontSize(14);
         doc.text("B.V. CHASCOMÚS - LIBRO DE GUARDIA", 14, 20);
@@ -216,6 +235,7 @@
             theme: 'striped'
         });
         doc.save(`SEMANA_${fS}_${usuarioLogueado}.pdf`);
+        mostrarAviso("📄 PDF Generado con éxito");
     }
 
     function cerrarSesion() {
