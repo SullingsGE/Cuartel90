@@ -20,7 +20,6 @@
             color: white; overflow: hidden; 
         }
 
-        /* FONDO CON TU FOTO REAL */
         .bg-unidad {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -41,50 +40,25 @@
             text-transform: uppercase; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        /* CONTENEDOR CENTRAL DE NAVEGACIÓN */
         .navigation-zone {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 30px;
+            flex-grow: 1; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 30px;
         }
 
-        /* BOTÓN DE GOOGLE MAPS */
         .btn-google-maps {
-            display: none; 
-            background: var(--nav);
-            color: white;
-            text-decoration: none;
-            padding: 35px;
-            border-radius: 20px;
-            font-size: 1.6rem;
-            font-weight: 900;
-            text-align: center;
-            border: 4px solid white;
-            box-shadow: 0 0 40px rgba(66, 133, 244, 0.6);
+            display: none; background: var(--nav); color: white;
+            text-decoration: none; padding: 35px; border-radius: 20px;
+            font-size: 1.6rem; font-weight: 900; text-align: center;
+            border: 4px solid white; width: 100%; max-width: 450px;
             animation: pulse 1.5s infinite;
-            width: 100%;
-            max-width: 450px;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
         #alerta-info-box {
-            display: none;
-            background: rgba(0,0,0,0.85);
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            border-left: 8px solid var(--primary);
-            width: 100%;
-            max-width: 500px;
-            backdrop-filter: blur(5px);
+            display: none; background: rgba(0,0,0,0.85); padding: 25px;
+            border-radius: 15px; margin-bottom: 30px; border-left: 8px solid var(--primary);
+            width: 100%; max-width: 500px;
         }
 
         .controls {
@@ -101,7 +75,6 @@
         .btn-llegada { background: var(--primary); }
         .btn-finalizar { background: var(--success); }
 
-        /* Pantalla Emergencia Full */
         #alerta-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 5000;
@@ -114,7 +87,6 @@
             position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
             background: var(--success); padding: 15px 40px; border-radius: 50px;
             font-weight: bold; z-index: 6000; display: none;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -144,7 +116,7 @@
     </div>
 
     <div id="alerta-overlay" onclick="aceptarAlerta()">
-        <h1 style="font-size: 3.5rem; color: #f1c40f; text-shadow: 0 0 20px rgba(0,0,0,0.5);">⚠️ ALERTA ⚠️</h1>
+        <h1 style="font-size: 3.5rem; color: #f1c40f;">⚠️ ALERTA ⚠️</h1>
         <div id="msg-alerta" style="text-align: center; margin: 40px; font-size: 2rem; font-weight: bold;"></div>
         <button class="btn-op" style="background: #fff; color: #000; padding: 25px 60px; border-radius: 50px;">RECIBIR Y NAVEGAR</button>
     </div>
@@ -153,28 +125,40 @@
         let client;
 
         function conectarMQTT() {
-            // Generar ID único para evitar recibir mensajes retenidos viejos
             const clientId = "B1_UNIT_" + Math.random().toString(16).slice(2, 5);
             client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", clientId);
             
             client.onMessageArrived = (msg) => {
                 try {
                     const data = JSON.parse(msg.payloadString);
+                    const ahora = Date.now();
                     
-                    // Solo activar si el mensaje tiene datos de despacho reales
+                    // FILTRO DE 30 SEGUNDOS:
+                    // Si el mensaje tiene un timestamp y es mayor a 30 seg, se ignora.
+                    // Si el servidor lo marca como "retained", también se ignora por precaución.
+                    if (msg.retained) return;
+                    
+                    if (data.timestamp) {
+                        const diferencia = (ahora - data.timestamp) / 1000;
+                        if (diferencia > 30) {
+                            console.log("Despacho antiguo ignorado (" + diferencia + "s)");
+                            return;
+                        }
+                    }
+
                     if (data.aviso && data.direccion) {
                         document.getElementById('txt-evento').innerText = data.aviso;
                         document.getElementById('txt-dir').innerText = data.direccion;
                         document.getElementById('msg-alerta').innerHTML = `${data.aviso}<br><b>${data.direccion}</b>`;
                         
-                        // URL de Google Maps para navegación directa
+                        // Generar link de navegación
                         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lon}&travelmode=driving`;
                         document.getElementById('btn-maps').href = mapsUrl;
                         
                         document.getElementById('alerta-overlay').style.display = 'flex';
                         if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
                     }
-                } catch (e) { console.error("Error en mensaje:", e); }
+                } catch (e) { console.error("Error:", e); }
             };
 
             client.connect({ 
@@ -212,12 +196,9 @@
         }
 
         function resetearInterfaz() {
-            // Limpiar visuales y textos para evitar mensajes fantasmales
             document.getElementById('alerta-info-box').style.display = 'none';
             document.getElementById('btn-maps').style.display = 'none';
             document.getElementById('alerta-overlay').style.display = 'none';
-            document.getElementById('txt-evento').innerText = "";
-            document.getElementById('txt-dir').innerText = "";
             document.getElementById('status-txt').innerText = "🚒 UNIDAD B1: DISPONIBLE";
             document.getElementById('status-txt').style.background = "#c0392b";
         }
