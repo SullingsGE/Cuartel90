@@ -8,37 +8,34 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     
     <style>
-        :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); }
+        :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); --danger: #c0392b; }
         body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; color: white; }
         
         .bg-cuartel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: url('cuartel.jpg') no-repeat center center; background-size: cover; filter: blur(8px) brightness(0.4); z-index: 1; }
         
-        /* Paneles */
         .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.4s ease-out; z-index: 1000; display: flex; visibility: hidden; }
         .full-panel.active { left: 0; visibility: visible; }
         
         #map-full { position: absolute; top: 0; left: 0; width: calc(100% - 400px); height: 100%; background: #111; }
         
-        /* Pestañas laterales */
         .handle-container { position: fixed; left: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 2000; }
         .drawer-handle { width: 45px; height: 180px; background: var(--card); border: 2px solid var(--primary); border-left: none; border-radius: 0 12px 12px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
         
-        /* Despacho */
         #despacho-control { width: 400px; background: var(--card); padding: 25px; box-sizing: border-box; border-left: 2px solid var(--primary); display: flex; flex-direction: column; position: absolute; right: 0; height: 100%; }
-        .panel-header { width: 100%; height: 100px; background: url('escudo.png') no-repeat center; background-size: contain; margin-bottom: 10px; }
         
         .input-std { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.6); border: 1px solid #555; color: white; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         .btn-tipo { width: 100%; padding: 10px; margin-bottom: 6px; border: 2px solid transparent; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; opacity: 0.6; font-size: 11px; }
         .btn-tipo.selected { opacity: 1; border: 2px solid #fff; }
-        .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; text-transform: uppercase; }
+        
+        .btn-action { width: 100%; padding: 20px; background: var(--primary); border: none; color: white; font-weight: 900; font-size: 18px; cursor: pointer; border-radius: 8px; text-transform: uppercase; margin-bottom: 10px; }
+        
+        /* BOTÓN DE SALIDA */
+        .btn-nav-index { width: 100%; padding: 15px; background: #222; border: 1px solid #444; color: #fff; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; margin-top: auto; }
+        .btn-nav-index:hover { background: var(--danger); }
 
         .close-btn { position: absolute; top: 20px; right: 30px; font-size: 45px; color: white; cursor: pointer; background: none; border: none; z-index: 1100; }
         
-        #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.98); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #bit-login { max-width: 350px; width: 100%; display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 12px; border: 1px solid var(--primary); }
-        #bit-ui { display:none; height: 90%; width: 100%; max-width: 1000px; flex-direction: column; }
-        #historial-bit { flex-grow: 1; background: rgba(0,0,0,0.5); overflow-y: auto; margin: 20px 0; padding: 20px; border-radius: 8px; border: 1px solid #444; font-size: 14px; }
-        .log-entry { border-left: 4px solid var(--primary); background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 10px; border-radius: 0 4px 4px 0; }
+        #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.98); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
     </style>
 </head>
 <body>
@@ -54,9 +51,10 @@
     <button class="close-btn" onclick="cerrarPaneles()">×</button>
     <div id="map-full"></div>
     <div id="despacho-control">
-        <div class="panel-header"></div> 
+        <div style="height:80px; background: url('escudo.png') no-repeat center/contain; margin-bottom:10px;"></div>
         <input id="pac-input" class="input-std" type="text" placeholder="Calle en Chascomús...">
-        <div style="margin: 15px 0; flex-grow: 1; overflow-y: auto;">
+        
+        <div style="margin: 10px 0; flex-grow: 1; overflow-y: auto;">
             <button class="btn-tipo" style="background: #2980b9;" onclick="seleccionar(this, 'RESCATE PERS/ANIMAL')">RESCATE PERS/ANIMAL</button>
             <button class="btn-tipo" style="background: #2980b9;" onclick="seleccionar(this, 'RESCATE TECNICO')">RESCATE TECNICO</button>
             <button class="btn-tipo" style="background: #f1c40f; color:black;" onclick="seleccionar(this, 'ACCIDENTE')">ACCIDENTE</button>
@@ -66,6 +64,8 @@
         </div>
 
         <button class="btn-action" onclick="ejecutarDespacho()">REGISTRAR SALIDA</button>
+        
+        <button class="btn-nav-index" onclick="window.location.href='index.html'">← VOLVER AL MENÚ</button>
     </div>
 </div>
 
@@ -73,17 +73,20 @@
     <button class="close-btn" onclick="cerrarPaneles()">×</button>
     <div id="bitacora-content">
         <h2 style="color:var(--primary); font-size: 35px; margin-bottom: 20px;">LIBRO DE GUARDIA</h2>
+        
+        <button class="btn-nav-index" style="width: 250px; margin-bottom: 20px;" onclick="window.location.href='index.html'">← VOLVER AL MENÚ</button>
+
         <div id="bit-login">
-            <h3 style="margin-top:0; font-size:14px; text-align:center;">INGRESO DE PERSONAL</h3>
             <input type="text" id="u-bit" class="input-std" placeholder="Usuario">
             <input type="password" id="p-bit" class="input-std" placeholder="Contraseña">
-            <button class="btn-action" onclick="loginBitacora()" style="padding:15px; font-size:14px;">ACCEDER</button>
+            <button class="btn-action" onclick="loginBitacora()">ACCEDER</button>
         </div>
-        <div id="bit-ui">
-            <div id="historial-bit"></div>
-            <div style="display:flex; gap:10px; align-items: flex-end;">
-                <textarea id="text-novedad" class="input-std" style="height:80px; resize:none;" placeholder="Escriba la novedad aquí..."></textarea>
-                <button class="btn-action" style="width:150px; height:80px; font-size:14px;" onclick="guardarNovedad()">GRABAR</button>
+
+        <div id="bit-ui" style="display:none; width:100%; max-width:800px;">
+            <div id="historial-bit" style="height:400px; background:rgba(0,0,0,0.5); overflow-y:auto; padding:15px; border:1px solid #444;"></div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <textarea id="text-novedad" class="input-std" placeholder="Novedad..."></textarea>
+                <button class="btn-action" style="width:150px;" onclick="guardarNovedad()">GRABAR</button>
             </div>
         </div>
     </div>
@@ -91,10 +94,8 @@
 
 <script>
     let map, marker, lat, lon, tipoSeleccionado = "";
-    let usuarioLogueado = "";
     let mqttClient;
 
-    // Configuración Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyBMNFRm_snxnwtU0sy9-q0zyfBcSzKOtS8",
         databaseURL: "https://bomberoschascomus90-default-rtdb.firebaseio.com",
@@ -104,10 +105,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Inicializar MQTT para envío de alertas
     function conectarMQTT() {
-        mqttClient = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "CENTRAL_CHASCOMUS_" + Math.random().toString(16).slice(2, 5));
-        mqttClient.connect({ useSSL: true, onSuccess: () => console.log("MQTT Central Conectado") });
+        mqttClient = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "CENTRAL_" + Date.now());
+        mqttClient.connect({ useSSL: true, onSuccess: () => console.log("MQTT Conectado") });
     }
 
     function abrirPanel(id) {
@@ -130,47 +130,40 @@
 
     function ejecutarDespacho() {
         let inputCalle = document.getElementById('pac-input');
-        if (!tipoSeleccionado || !lat) return alert("Faltan datos de siniestro o ubicación.");
+        if (!tipoSeleccionado || !lat) return alert("Faltan datos de ubicación o tipo.");
 
-        // ENVÍO DE ALERTA REAL VÍA MQTT
         const alerta = {
             aviso: tipoSeleccionado,
             direccion: inputCalle.value,
-            timestamp: Date.now() // CLAVE: Filtro de 30 seg para la unidad
+            timestamp: Date.now()
         };
 
-        const mensaje = new Paho.MQTT.Message(JSON.stringify(alerta));
-        mensaje.destinationName = "bomberos/unidad/B1";
-        mensaje.retained = false; // CLAVE: No guardar en el servidor
+        const msg = new Paho.MQTT.Message(JSON.stringify(alerta));
+        msg.destinationName = "bomberos/unidad/B1";
+        msg.retained = false;
         
         if (mqttClient && mqttClient.isConnected()) {
-            mqttClient.send(mensaje);
-            alert("ALERTA DESPACHADA A UNIDAD B1");
-        } else {
-            alert("Error: Central no conectada al servidor de alertas.");
-            conectarMQTT();
-            return;
+            mqttClient.send(msg);
+            alert("ALERTA DESPACHADA CORRECTAMENTE");
+            
+            // LIMPIEZA DE CAMPOS
+            inputCalle.value = "";
+            tipoSeleccionado = "";
+            document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
+            if (marker) marker.setMap(null);
+            lat = null;
         }
-
-        // REGLA: VACIAR CAMPOS CADA VEZ QUE SE ENVÍA
-        inputCalle.value = "";
-        tipoSeleccionado = "";
-        document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
-        if (marker) marker.setMap(null);
-        lat = null; lon = null;
     }
 
-    // Funciones Bitácora
     function loginBitacora() {
         const u = document.getElementById('u-bit').value.toLowerCase().trim();
         const p = document.getElementById('p-bit').value;
         db.ref('usuarios/' + u).once('value', snap => {
             if (snap.exists() && snap.val().password === p) {
-                usuarioLogueado = u.toUpperCase();
                 document.getElementById('bit-login').style.display = 'none';
-                document.getElementById('bit-ui').style.display = 'flex';
+                document.getElementById('bit-ui').style.display = 'block';
                 vincularBitacora();
-            } else { alert("Usuario o clave incorrectos"); }
+            } else { alert("Error de ingreso"); }
         });
     }
 
@@ -180,21 +173,10 @@
             box.innerHTML = "";
             snap.forEach(child => {
                 const item = child.val();
-                box.innerHTML += `<div class="log-entry"><b>[${item.fecha}] ${item.usuario}:</b> ${item.texto}</div>`;
+                box.innerHTML += `<div><b>[${item.fecha}] ${item.usuario}:</b> ${item.texto}</div>`;
             });
             box.scrollTop = box.scrollHeight;
         });
-    }
-
-    function guardarNovedad() {
-        const text = document.getElementById('text-novedad');
-        if(!text.value.trim()) return;
-        db.ref('bitacora').push({
-            usuario: usuarioLogueado,
-            fecha: new Date().toLocaleDateString('es-AR'),
-            texto: text.value.trim()
-        });
-        text.value = "";
     }
 
     function initMap() {
@@ -202,22 +184,20 @@
             zoom: 14, center: { lat: -35.576, lng: -58.010 },
             styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }]
         });
-        const bounds = new google.maps.LatLngBounds(new google.maps.LatLng(-35.9, -58.3), new google.maps.LatLng(-35.4, -57.7));
         const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), {
-            bounds: bounds, strictBounds: true
+            bounds: new google.maps.LatLngBounds({lat: -35.6, lng: -58.1}, {lat: -35.5, lng: -57.9}),
+            strictBounds: true
         });
         auto.addListener("place_changed", () => {
-            const p = auto.getPlace(); if (!p.geometry) return;
-            lat = p.geometry.location.lat(); lon = p.geometry.location.lng();
+            const p = auto.getPlace(); if(!p.geometry) return;
+            lat = p.geometry.location.lat();
             if (marker) marker.setMap(null);
-            marker = new google.maps.Marker({ position: {lat, lng: lon}, map: map });
-            map.panTo({lat, lng: lon});
+            marker = new google.maps.Marker({ position: p.geometry.location, map: map });
+            map.panTo(p.geometry.location);
         });
     }
 
-    window.onload = () => {
-        conectarMQTT();
-    };
+    window.onload = conectarMQTT;
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0_KPxSHGYgf-ewC3Cha0yH-ey8-up9ds&libraries=places&callback=initMap" async defer></script>
 </body>
