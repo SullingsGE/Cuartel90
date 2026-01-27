@@ -11,6 +11,9 @@
         
         body { margin: 0; background: var(--dark); color: white; font-family: 'Segoe UI', Roboto, sans-serif; }
         
+        /* Botón Volver al Menú */
+        .btn-back { position: fixed; top: 60px; right: 15px; z-index: 200; background: #333; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; font-size: 0.7rem; border: 1px solid #555; text-transform: uppercase; font-weight: bold; }
+
         /* Navegación por pestañas */
         .tabs { display: flex; background: var(--card); border-bottom: 3px solid var(--primary); position: sticky; top: 0; z-index: 100; }
         .tab-btn { flex: 1; padding: 15px 5px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
@@ -59,7 +62,6 @@
         input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: var(--input); color: white; box-sizing: border-box; font-size: 1rem; }
         textarea { resize: vertical; }
 
-        /* Ajuste para pantallas pequeñas */
         @media (max-width: 480px) {
             .form-grid { grid-template-columns: 1fr; }
             #txt-aviso { font-size: 1.2rem; }
@@ -67,6 +69,8 @@
     </style>
 </head>
 <body>
+
+    <a href="index.html" class="btn-back">« MENU</a>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab('nav')">Navegación</button>
@@ -80,7 +84,7 @@
         </div>
 
         <div class="grid-buttons">
-            <a id="btn-nav" href="#" class="btn-action btn-nav" style="display: none;">MAPA GPS</a>
+            <a id="btn-nav" href="#" class="btn-action btn-nav" style="display: none;" onclick="limpiarAlerta()">MAPA GPS</a>
             <button class="btn-action btn-llegada" onclick="marcar('llegada')">Llegada al Lugar</button>
             <button class="btn-action btn-fin" onclick="marcar('fin_trabajo')">Fin de Trabajo</button>
             <button class="btn-action btn-cuartel" onclick="marcar('cuartel')">Llegada al Cuartel</button>
@@ -116,35 +120,46 @@
             event.currentTarget.classList.add('active');
         }
 
-        // MQTT Config
         var client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "REC_" + Math.random().toString(16).slice(2, 6));
         
         client.onMessageArrived = (msg) => {
             var data = JSON.parse(msg.payloadString);
-            document.getElementById("txt-aviso").innerText = data.aviso;
-            document.getElementById("txt-dir-alerta").innerText = data.direccion;
             
-            // Llenar planilla automáticamente
-            document.getElementById("f_calle").value = data.direccion;
-            document.getElementById("f_fecha").value = new Date().toISOString().split('T')[0];
-            document.getElementById("f_h_llamado").value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            // FILTRO DE TIEMPO: Solo procesa si la alerta tiene menos de 45 segundos
+            let ahora = Date.now();
+            let diferencia = ahora - (data.timestamp || 0);
 
-            // Mostrar botón GPS del mismo tamaño que los demás
-            var navBtn = document.getElementById("btn-nav");
-            navBtn.href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
-            navBtn.style.display = "flex";
-            
-            new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+            if (data.aviso && diferencia < 45000) {
+                document.getElementById("txt-aviso").innerText = data.aviso;
+                document.getElementById("txt-dir-alerta").innerText = data.direccion;
+                
+                document.getElementById("f_calle").value = data.direccion;
+                document.getElementById("f_fecha").value = new Date().toISOString().split('T')[0];
+                document.getElementById("f_h_llamado").value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                var navBtn = document.getElementById("btn-nav");
+                navBtn.href = `google.navigation:q=${data.lat},${data.lon}&mode=d`;
+                navBtn.style.display = "flex";
+                
+                new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+            }
         };
 
         client.connect({ useSSL: true, onSuccess: () => client.subscribe("bomberos/unidad/B1") });
+
+        function limpiarAlerta() {
+            // Espera un momento para que el navegador procese el link GPS y luego limpia
+            setTimeout(() => {
+                document.getElementById("txt-aviso").innerText = "ESPERANDO...";
+                document.getElementById("txt-dir-alerta").innerText = "No hay servicios activos";
+                document.getElementById("btn-nav").style.display = "none";
+            }, 5000);
+        }
 
         function marcar(evento) {
             let h = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             if(evento === 'llegada') document.getElementById("f_h_llegada").value = h;
             if(evento === 'fin_trabajo') document.getElementById("f_h_fin").value = h;
-            
-            // Notificar a la central
             client.send(new Paho.MQTT.Message(JSON.stringify({evento: evento, hora: h})), "bomberos/unidad/B1/estado");
             alert("Hora de " + evento + " registrada: " + h);
         }
@@ -153,35 +168,28 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const val = (id) => document.getElementById(id).value;
-
-            // Diseño basado en el PDF de Bomberos Chascomús
             doc.setFont("helvetica", "bold");
             doc.text("SOCIEDAD DE BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 10, 15);
             doc.setFontSize(10);
             doc.setFont("helvetica", "normal");
             doc.text("Fundada el 19 de Noviembre de 1960 | Soler 347", 10, 22);
             doc.line(10, 25, 200, 25);
-
             doc.setFontSize(14);
             doc.text("INFORME DE SERVICIO", 80, 35);
-
             doc.setFontSize(11);
             doc.text("FECHA: " + val('f_fecha'), 10, 50);
             doc.text("UBICACIÓN: " + val('f_calle'), 10, 60);
-            
             doc.rect(10, 65, 190, 30);
             doc.text("HORARIOS", 15, 72);
             doc.setFontSize(9);
             doc.text("Llamado: " + val('f_h_llamado'), 15, 80);
             doc.text("Llegada: " + val('f_h_llegada'), 70, 80);
             doc.text("Fin de Trabajo: " + val('f_h_fin'), 130, 80);
-
             doc.setFontSize(11);
             doc.text("OBSERVACIONES / VEHÍCULOS:", 10, 105);
             doc.rect(10, 107, 190, 80);
             var splitObs = doc.splitTextToSize(val('f_obs'), 180);
             doc.text(splitObs, 15, 115);
-
             doc.save("Informe_" + val('f_fecha') + ".pdf");
         }
     </script>
