@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
-        :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); --danger: #c0392b; --success: #27ae60; --info: #2980b9; }
+        :root { --primary: #e67e22; --dark: #0b0e11; --card: rgba(21, 25, 29, 0.95); --danger: #c0392b; --success: #27ae60; --info: #2980b9; --purple: #8e44ad; --gray: #7f8c8d; }
         body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; color: white; }
         .bg-cuartel { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: url('cuartel.jpg') no-repeat center center; background-size: cover; filter: blur(8px) brightness(0.4); z-index: 1; }
         .full-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; transition: 0.4s ease-out; z-index: 1000; display: flex; visibility: hidden; }
@@ -25,6 +25,12 @@
         .btn-nav-index { width: 100%; padding: 15px; background: #222; border: 1px solid #444; color: #fff; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; margin-top: auto; }
         .btn-nav-index:hover { background: var(--danger); }
         .close-btn { position: absolute; top: 20px; right: 30px; font-size: 45px; color: white; cursor: pointer; background: none; border: none; z-index: 1100; }
+        
+        /* Modal Personalizado */
+        #custom-alert { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid var(--primary); padding: 30px; border-radius: 12px; z-index: 5000; text-align: center; display: none; box-shadow: 0 0 50px rgba(0,0,0,0.8); min-width: 300px; }
+        #custom-alert h3 { color: var(--primary); margin-top: 0; }
+        #custom-alert button { background: var(--primary); color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+
         #bitacora-content { width: 100%; height: 100%; background: rgba(11, 14, 17, 0.98); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; overflow-y: auto;}
         .bit-card { background: #15191d; border: 1px solid #333; padding: 20px; border-radius: 10px; width: 100%; max-width: 800px; margin-top: 10px; }
         .admin-section { border: 1px solid var(--danger); padding: 15px; margin-top: 20px; width: 100%; max-width: 800px; border-radius: 10px; }
@@ -35,6 +41,12 @@
 <body>
 
 <div class="bg-cuartel"></div>
+
+<div id="custom-alert">
+    <h3 id="alert-title">SISTEMA CENTRAL</h3>
+    <p id="alert-msg"></p>
+    <button onclick="cerrarAlert()">ACEPTAR</button>
+</div>
 
 <div class="handle-container">
     <div class="drawer-handle" onclick="abrirPanel('panel-despacho')">DESPACHO</div>
@@ -54,6 +66,8 @@
             <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO FORESTAL')">INCENDIO FORESTAL</button>
             <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO ESTRUCTURAL')">INCENDIO ESTRUCTURAL</button>
             <button class="btn-tipo" style="background: #c0392b;" onclick="seleccionar(this, 'INCENDIO VEHICULAR')">INCENDIO VEHICULAR</button>
+            <button class="btn-tipo" style="background: var(--purple);" onclick="seleccionar(this, 'MAT-PEL')">MAT-PEL</button>
+            <button class="btn-tipo" style="background: var(--gray);" onclick="seleccionar(this, 'OTRO')">OTRO</button>
         </div>
         <button class="btn-action" onclick="ejecutarDespacho()">REGISTRAR SALIDA</button>
         <button class="btn-nav-index" onclick="window.location.href='index.html'">← VOLVER AL MENÚ</button>
@@ -86,17 +100,6 @@
                 <button class="btn-tipo" style="opacity: 1; background: var(--info); margin-top: 10px;" onclick="generarPDF7Dias()">DESCARGAR SEMANA (SÁB-VIE) PDF</button>
             </div>
         </div>
-
-        <div id="admin-ui" style="display:none; width:100%; max-width:800px;">
-            <div class="admin-section">
-                <h3 style="color: var(--danger); margin:0;">PANEL DE CONTROL (ADMIN)</h3>
-                <label style="display: flex; align-items: center; gap: 10px; margin-top: 15px; cursor: pointer;">
-                    <input type="checkbox" id="check-registro" onchange="toggleRegistro(this.checked)"> 
-                    PERMITIR QUE NUEVOS USUARIOS SE REGISTREN
-                </label>
-                <div class="user-list" id="lista-usuarios-admin"></div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -114,9 +117,13 @@
     let usuarioActivo = null;
     let timeoutSesion = null;
 
-    db.ref('configuracion/registroAbierto').on('value', snap => {
-        document.getElementById('area-registro').style.display = snap.val() ? 'block' : 'none';
-    });
+    // Funciones de Alerta Personalizada
+    function mostrarAlert(msg, titulo = "SISTEMA CENTRAL") {
+        document.getElementById('alert-msg').innerText = msg;
+        document.getElementById('alert-title').innerText = titulo;
+        document.getElementById('custom-alert').style.display = 'block';
+    }
+    function cerrarAlert() { document.getElementById('custom-alert').style.display = 'none'; }
 
     function loginSistema() {
         const u = document.getElementById('u-bit').value.toLowerCase().trim();
@@ -124,8 +131,8 @@
         if(u === "admin" && p === "admin") {
             usuarioActivo = "ADMIN";
             document.getElementById('bit-login').style.display = 'none';
-            document.getElementById('admin-ui').style.display = 'block';
-            cargarListaUsuarios();
+            document.getElementById('bit-ui').style.display = 'block';
+            vincularBitacora(); 
             return;
         }
         db.ref('usuarios/' + u).once('value', snap => {
@@ -134,19 +141,7 @@
                 document.getElementById('bit-login').style.display = 'none';
                 document.getElementById('bit-ui').style.display = 'block';
                 vincularBitacora();
-            } else { alert("Usuario o contraseña incorrectos"); }
-        });
-    }
-
-    function registrarNuevo() {
-        const u = document.getElementById('u-bit').value.toLowerCase().trim();
-        const p = document.getElementById('p-bit').value;
-        if(u.length < 3 || p.length < 3) return alert("Usuario/Clave muy cortos");
-        db.ref('usuarios/' + u).once('value', snap => {
-            if(snap.exists()) return alert("El usuario ya existe");
-            db.ref('usuarios/' + u).set({ password: p, fechaCreado: Date.now() }).then(() => {
-                alert("Perfil creado. Ya puede acceder.");
-            });
+            } else { mostrarAlert("Usuario o contraseña incorrectos", "ERROR"); }
         });
     }
 
@@ -181,82 +176,6 @@
         });
     }
 
-    function toggleRegistro(valor) { db.ref('configuracion/registroAbierto').set(valor); }
-
-    function cargarListaUsuarios() {
-        db.ref('usuarios').on('value', snap => {
-            const list = document.getElementById('lista-usuarios-admin');
-            list.innerHTML = "<h4>Gestión de Usuarios</h4>";
-            snap.forEach(child => {
-                const u = child.key;
-                list.innerHTML += `<div class="user-item">
-                    <span>${u}</span>
-                    <button style="background:var(--danger); color:white; border:none; padding:2px 10px; cursor:pointer;" onclick="eliminarUsuario('${u}')">Eliminar</button>
-                </div>`;
-            });
-        });
-    }
-
-    function eliminarUsuario(u) {
-        if(confirm("¿Eliminar usuario " + u + "?")) { db.ref('usuarios/' + u).remove(); }
-    }
-
-    function generarPDF7Dias() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        let hoy = new Date();
-        let diaSemana = hoy.getDay(); 
-        let diffSabado = (diaSemana === 6) ? 0 : (diaSemana + 1);
-        let fechaInicio = new Date(hoy);
-        fechaInicio.setDate(hoy.getDate() - diffSabado);
-        fechaInicio.setHours(0,0,0,0);
-        let diffViernes = (diaSemana === 5) ? 0 : (5 - diaSemana);
-        if (diaSemana === 6) diffViernes = 6;
-        let fechaFin = new Date(hoy);
-        fechaFin.setDate(hoy.getDate() + diffViernes);
-        fechaFin.setHours(23,59,59,999);
-
-        const fiStr = fechaInicio.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'});
-        const ffStr = fechaFin.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'});
-
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("BOMBEROS VOLUNTARIOS DE CHASCOMÚS", 105, 15, { align: "center" });
-        doc.setFontSize(12);
-        doc.text(`Semana del ${fiStr} al ${ffStr}`, 105, 22, { align: "center" });
-        doc.text(`Usuario: ${usuarioActivo.toUpperCase()}`, 105, 28, { align: "center" });
-        doc.line(20, 32, 190, 32);
-
-        db.ref('bitacora').orderByChild('timestamp').startAt(fechaInicio.getTime()).endAt(fechaFin.getTime()).once('value', snap => {
-            let y = 40;
-            let ultimoDiaVisto = "";
-            snap.forEach(child => {
-                const item = child.val();
-                if(item.usuario === usuarioActivo) {
-                    let fechaDia = item.fecha.split(" ")[0];
-                    if(fechaDia !== ultimoDiaVisto) {
-                        if(y > 250) { doc.addPage(); y = 20; }
-                        y += 5;
-                        doc.setFont("helvetica", "bold");
-                        doc.setFillColor(230, 230, 230);
-                        doc.rect(20, y, 170, 7, 'F');
-                        doc.text(`DÍA: ${fechaDia}`, 25, y + 5);
-                        y += 12;
-                        ultimoDiaVisto = fechaDia;
-                    }
-                    doc.setFont("helvetica", "normal");
-                    let hora = item.fecha.split(" ")[1];
-                    const textoCompleto = `${hora} hs - ${item.texto}`;
-                    const lines = doc.splitTextToSize(textoCompleto, 160);
-                    if (y + (lines.length * 7) > 275) { doc.addPage(); y = 20; }
-                    doc.text(lines, 25, y);
-                    y += (lines.length * 7) + 2;
-                }
-            });
-            doc.save(`Semana_${fiStr.replace(/\//g,'-')}_al_${ffStr.replace(/\//g,'-')}_${usuarioActivo}.pdf`);
-        });
-    }
-
     function abrirPanel(id) {
         if(timeoutSesion) { clearTimeout(timeoutSesion); timeoutSesion = null; }
         cerrarPaneles();
@@ -270,7 +189,6 @@
             timeoutSesion = setTimeout(() => {
                 usuarioActivo = null;
                 document.getElementById('bit-ui').style.display = 'none';
-                document.getElementById('admin-ui').style.display = 'none';
                 document.getElementById('bit-login').style.display = 'block';
                 document.getElementById('u-bit').value = "";
                 document.getElementById('p-bit').value = "";
@@ -283,20 +201,22 @@
         mqttClient = new Paho.MQTT.Client("broker.hivemq.com", 8884, "/mqtt", "CENTRAL_" + Date.now());
         mqttClient.connect({ useSSL: true, onSuccess: () => console.log("MQTT Conectado") });
     }
+    
     function seleccionar(btn, tipo) {
         document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         tipoSeleccionado = tipo;
     }
+
     function ejecutarDespacho() {
         let inputCalle = document.getElementById('pac-input');
-        if (!tipoSeleccionado || !lat) return alert("Faltan datos de ubicación o tipo.");
+        if (!tipoSeleccionado || !lat) return mostrarAlert("Faltan datos de ubicación o tipo.", "ATENCIÓN");
         const alerta = { aviso: tipoSeleccionado, direccion: inputCalle.value, timestamp: Date.now() };
         const msg = new Paho.MQTT.Message(JSON.stringify(alerta));
         msg.destinationName = "bomberos/unidad/B1";
         if (mqttClient && mqttClient.isConnected()) {
             mqttClient.send(msg);
-            alert("ALERTA DESPACHADA CORRECTAMENTE");
+            mostrarAlert("ALERTA DESPACHADA CORRECTAMENTE", "ÉXITO");
             inputCalle.value = "";
             tipoSeleccionado = "";
             document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
@@ -304,6 +224,7 @@
             lat = null;
         }
     }
+
     function initMap() {
         map = new google.maps.Map(document.getElementById("map-full"), {
             zoom: 14, center: { lat: -35.576, lng: -58.010 },
