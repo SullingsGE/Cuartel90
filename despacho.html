@@ -65,7 +65,7 @@
             <span style="font-size: 10px; color: #aaa;">MONITOR HDMI</span>
             <button class="btn-monitor-small" style="background:var(--success)" onclick="abrirMonitor()">1. VINCULAR VENTANA</button>
             <input type="file" id="file-bg" style="display:none" accept="image/*" onchange="cargarImagenFondo(event)">
-            <button class="btn-monitor-small" onclick="document.getElementById('file-bg').click()">2. CARGAR IMAGEN FONDO</button>
+            <button class="btn-monitor-small" onclick="document.getElementById('file-bg').click()">2. CARGAR IMAGEN / QUITAR ALERTA</button>
         </div>
         <div style="height:60px; background: url('escudo.png') no-repeat center/contain; margin-bottom:10px;"></div>
         <input id="pac-input" class="input-std" type="text" placeholder="Calle en Chascomús...">
@@ -105,7 +105,13 @@
         </div>
         <div id="admin-ui" style="display:none; width:100%; max-width:800px;">
             <div class="admin-section">
-                <h3 style="color: var(--danger); margin:0;">PANEL DE CONTROL (ADMIN)</h3>
+                <h3 style="color: var(--danger); margin:0;">PANEL ADMIN</h3>
+                <div style="background: #222; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <label style="cursor:pointer; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="chk-registro-abierto" onchange="actualizarModoRegistro(this.checked)">
+                        PERMITIR REGISTRO AUTOMÁTICO DE NUEVOS PERFILES
+                    </label>
+                </div>
                 <div class="user-list" id="lista-usuarios-admin"></div>
             </div>
         </div>
@@ -116,6 +122,7 @@
     let map, marker, lat, lon, tipoSeleccionado = "";
     let mqttClient, winMonitor = null, hdmiTimeout = null, timeoutSesion = null;
     let urlImagenFondo = "escudo.png";
+    let registroAbierto = false;
 
     const firebaseConfig = {
         apiKey: "AIzaSyBMNFRm_snxnwtU0sy9-q0zyfBcSzKOtS8",
@@ -127,7 +134,13 @@
     const db = firebase.database();
     let usuarioActivo = null;
 
-    // --- SESIÓN Y PANELES ---
+    db.ref('configuracion/registroAbierto').on('value', snap => {
+        registroAbierto = snap.val() || false;
+        const chk = document.getElementById('chk-registro-abierto');
+        if(chk) chk.checked = registroAbierto;
+    });
+    function actualizarModoRegistro(val) { db.ref('configuracion/registroAbierto').set(val); }
+
     function abrirPanel(id) {
         if(timeoutSesion) { clearTimeout(timeoutSesion); timeoutSesion = null; }
         cerrarPaneles();
@@ -146,29 +159,46 @@
                 document.getElementById('bit-login').style.display = 'block';
                 document.getElementById('u-bit').value = "";
                 document.getElementById('p-bit').value = "";
-            }, 30000); // 30 segundos
+            }, 30000); 
         }
     }
 
-    // --- BITÁCORA ---
     function loginSistema() {
         const u = document.getElementById('u-bit').value.toLowerCase().trim();
         const p = document.getElementById('p-bit').value;
+        if(!u || !p) return;
         if(u === "admin" && p === "admin") {
             usuarioActivo = "ADMIN";
-            document.getElementById('bit-login').style.display = 'none';
-            document.getElementById('admin-ui').style.display = 'block';
-            document.getElementById('bit-ui').style.display = 'block';
-            cargarListaUsuarios(); vincularBitacora(); return;
+            mostrarInterfazLogueado(true);
+            return;
         }
         db.ref('usuarios/' + u).once('value', snap => {
-            if (snap.exists() && snap.val().password === p) {
-                usuarioActivo = u;
-                document.getElementById('bit-login').style.display = 'none';
-                document.getElementById('bit-ui').style.display = 'block';
-                vincularBitacora();
-            } else { mostrarAlert("Credenciales incorrectas", "ERROR"); }
+            if (snap.exists()) {
+                if(snap.val().password === p) {
+                    usuarioActivo = u;
+                    mostrarInterfazLogueado(false);
+                } else { mostrarAlert("Contraseña incorrecta", "ERROR"); }
+            } else {
+                if(registroAbierto) {
+                    if(confirm("El usuario no existe. ¿Crear perfil?")) {
+                        db.ref('usuarios/' + u).set({ password: p }).then(() => {
+                            usuarioActivo = u;
+                            mostrarInterfazLogueado(false);
+                        });
+                    }
+                } else { mostrarAlert("Registro cerrado.", "ERROR"); }
+            }
         });
+    }
+
+    function mostrarInterfazLogueado(esAdmin) {
+        document.getElementById('bit-login').style.display = 'none';
+        document.getElementById('bit-ui').style.display = 'block';
+        if(esAdmin) {
+            document.getElementById('admin-ui').style.display = 'block';
+            cargarListaUsuarios();
+        }
+        vincularBitacora();
     }
 
     function vincularBitacora() {
@@ -241,30 +271,46 @@
                     y += (lines.length * 7) + 2;
                 }
             });
-            doc.save(`Semana_del_${fiStr.replace(/\//g,'-')}_al_${ffStr.replace(/\//g,'-')}_${usuarioActivo}.pdf`);
+            doc.save(`Semana_${fiStr.replace(/\//g,'-')}_al_${ffStr.replace(/\//g,'-')}_${usuarioActivo}.pdf`);
         });
     }
 
-    // --- MONITOR HDMI Y DESPACHO ---
+    // --- MONITOR HDMI ---
     function abrirMonitor() { winMonitor = window.open('', 'MonitorB1', 'width=1280,height=720'); resetearMonitor(); }
     
     function cargarImagenFondo(e) {
-        const file = e.target.files[0]; if(!file) return;
+        const file = e.target.files[0]; 
+        if(!file) return;
         const reader = new FileReader();
-        reader.onload = (ev) => { urlImagenFondo = ev.target.result; resetearMonitor(); };
+        reader.onload = (ev) => { 
+            urlImagenFondo = ev.target.result; 
+            if (hdmiTimeout) { clearTimeout(hdmiTimeout); hdmiTimeout = null; }
+            resetearMonitor(); 
+            e.target.value = ""; // Permite cargar la misma imagen después
+        };
         reader.readAsDataURL(file);
     }
 
     function resetearMonitor() {
         if (!winMonitor || winMonitor.closed) return;
-        winMonitor.document.body.innerHTML = `<div style="background:#000 url('${urlImagenFondo}') no-repeat center center; background-size: contain; height: 100vh; width: 100vw; margin: 0;"></div>`;
-        winMonitor.document.body.style.margin = "0"; winMonitor.document.body.style.overflow = "hidden";
+        winMonitor.document.body.innerHTML = "";
+        winMonitor.document.body.style.margin = "0";
+        winMonitor.document.body.style.overflow = "hidden";
+        winMonitor.document.body.style.backgroundColor = "#000";
+        
+        const imgDiv = winMonitor.document.createElement('div');
+        imgDiv.style.width = "100vw"; imgDiv.style.height = "100vh";
+        imgDiv.style.backgroundImage = `url('${urlImagenFondo}')`;
+        imgDiv.style.backgroundRepeat = "no-repeat";
+        imgDiv.style.backgroundPosition = "center center";
+        imgDiv.style.backgroundSize = "contain";
+        winMonitor.document.body.appendChild(imgDiv);
     }
 
     function ejecutarDespacho() {
         let inputCalle = document.getElementById('pac-input');
         const direccionCompleta = inputCalle.value;
-        if (!tipoSeleccionado || !lat) return mostrarAlert("Faltan datos de ubicación o tipo.", "ATENCIÓN");
+        if (!tipoSeleccionado || !lat) return mostrarAlert("Faltan datos", "ATENCIÓN");
 
         const msg = new Paho.MQTT.Message(JSON.stringify({ aviso: tipoSeleccionado, direccion: direccionCompleta, timestamp: Date.now() }));
         msg.destinationName = "bomberos/unidad/B1";
@@ -283,17 +329,17 @@
                             <p style="font-size:100px; font-weight:bold; margin:0; text-transform:uppercase; line-height:1;">${direccionCorta}</p>
                         </div>
                     </div>`;
+                
                 if (hdmiTimeout) clearTimeout(hdmiTimeout);
-                hdmiTimeout = setTimeout(() => { resetearMonitor(); }, 30 * 60 * 1000); // 30 Minutos
+                hdmiTimeout = setTimeout(() => { resetearMonitor(); hdmiTimeout = null; }, 15 * 60 * 1000); 
             }
-            mostrarAlert("ALERTA DESPACHADA CORRECTAMENTE", "ÉXITO");
+            mostrarAlert("DESPACHADO", "ÉXITO");
             inputCalle.value = ""; tipoSeleccionado = "";
             document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected'));
             if (marker) marker.setMap(null); lat = null;
         }
     }
 
-    // --- MAPA E INICIO ---
     function initMap() {
         map = new google.maps.Map(document.getElementById("map-full"), { zoom: 14, center: { lat: -35.576, lng: -58.010 }, styles: [{ "featureType": "all", "stylers": [{ "invert_lightness": true }] }] });
         const auto = new google.maps.places.Autocomplete(document.getElementById("pac-input"), { bounds: new google.maps.LatLngBounds({lat: -35.6, lng: -58.1}, {lat: -35.5, lng: -57.9}), strictBounds: true });
@@ -304,7 +350,7 @@
     function seleccionar(btn, t) { document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); tipoSeleccionado = t; }
     function mostrarAlert(m, t) { document.getElementById('alert-msg').innerText = m; document.getElementById('alert-title').innerText = t; document.getElementById('custom-alert').style.display = 'block'; }
     function cerrarAlert() { document.getElementById('custom-alert').style.display = 'none'; }
-    function cargarListaUsuarios() { db.ref('usuarios').on('value', snap => { const list = document.getElementById('lista-usuarios-admin'); if(!list) return; list.innerHTML = "<h4>Gestión de Usuarios</h4>"; snap.forEach(child => { const u = child.key; list.innerHTML += `<div class="user-item"><span>${u}</span><button style="background:var(--danger); color:white; border:none; padding:2px 10px; cursor:pointer;" onclick="eliminarUsuario('${u}')">Eliminar</button></div>`; }); }); }
+    function cargarListaUsuarios() { db.ref('usuarios').on('value', snap => { const list = document.getElementById('lista-usuarios-admin'); if(!list) return; list.innerHTML = "<h4>Usuarios</h4>"; snap.forEach(child => { const u = child.key; list.innerHTML += `<div class="user-item"><span>${u}</span><button style="background:var(--danger); color:white; border:none; padding:2px 10px; cursor:pointer;" onclick="eliminarUsuario('${u}')">Eliminar</button></div>`; }); }); }
     function eliminarUsuario(u) { if(confirm("¿Eliminar usuario " + u + "?")) { db.ref('usuarios/' + u).remove(); } }
 
     window.onload = conectarMQTT;
